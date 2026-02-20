@@ -32,6 +32,30 @@ export class AIController {
       }
     }
   }
+
+  // Add this below your existing getSmartAssignment method
+  public async getScores(req: AuthRequest, res: Response): Promise<void> {
+    try {
+      const orgId = req.user!.orgId;
+      // We join the employees and ai_scores tables to get the names AND the scores
+      const query = `
+        SELECT e.name, e.role, a.productivity_score, a.task_completion_rate, a.trend, a.computed_at 
+        FROM employees e 
+        JOIN ai_scores a ON e.id = a.employee_id 
+        WHERE e.org_id = $1
+        ORDER BY a.productivity_score DESC
+      `;
+      
+      // Note: You'll need to import 'db' at the top of AIController if it's not there:
+      // import db from '../config/db';
+      const { default: db } = await import('../config/db'); 
+
+      const result = await db.query(query, [orgId]);
+      res.status(200).json({ success: true, data: result.rows });
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: 'Failed to fetch AI scores' });
+    }
+  }
 }
 
 export default new AIController();
