@@ -1,5 +1,3 @@
-// src/controllers/EmployeeController.ts
-
 import { Response } from 'express';
 import { AuthRequest } from '../middleware/auth.middleware';
 import EmployeeService from '../services/EmployeeService';
@@ -20,13 +18,10 @@ export class EmployeeController {
     try {
       const orgId = req.user!.orgId;
 
-      // 2. Validate input
       const validatedData = createEmployeeSchema.parse(req.body);
 
-      // 3. Pass to service layer
       const newEmployee = await EmployeeService.addEmployee(orgId, validatedData);
 
-      // 4. Return success
       res.status(201).json({
         success: true,
         message: 'Employee added successfully',

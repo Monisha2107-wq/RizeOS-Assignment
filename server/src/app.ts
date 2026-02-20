@@ -2,6 +2,8 @@ import express, { Application, Request, Response } from 'express';
 import cors from 'cors';
 import authRoutes from './routes/auth.routes';
 import employeeRoutes from './routes/employee.routes';
+import taskRoutes from './routes/task.routes';
+import aiRoutes from './routes/ai.routes';
 
 class App {
   public express: Application;
@@ -25,6 +27,8 @@ class App {
 
     this.express.use('/api/auth', authRoutes);
     this.express.use('/api/employees', employeeRoutes);
+    this.express.use('/api/tasks', taskRoutes);
+    this.express.use('/api/ai', aiRoutes);
   }
 }
 

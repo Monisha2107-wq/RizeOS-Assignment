@@ -4,13 +4,24 @@ import db from '../config/db';
 
 const runMigrations = async () => {
   try {
-    const sqlPath = path.join(__dirname, '../../migrations/001_initial_schema.sql');
-    const sql = fs.readFileSync(sqlPath, 'utf8');
+    const migrationsDir = path.join(__dirname, '../../migrations');
     
+    const files = fs.readdirSync(migrationsDir).sort();
+
     console.log('Running database migrations...');
-    await db.query(sql);
-    console.log('Migrations executed successfully! Tables are ready.');
+
+    for (const file of files) {
+      if (file.endsWith('.sql')) {
+        console.log(`Executing ${file}...`);
+        const sqlPath = path.join(migrationsDir, file);
+        const sql = fs.readFileSync(sqlPath, 'utf8');
+        
+        await db.query(sql);
+        console.log(`Finished ${file}`);
+      }
+    }
     
+    console.log('All migrations executed successfully! Tables are ready.');
     process.exit(0);
   } catch (error) {
     console.error('Migration failed:', error);

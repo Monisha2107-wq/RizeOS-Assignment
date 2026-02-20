@@ -1,7 +1,5 @@
--- Enable UUID generation
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
--- 1. Organizations Table
 CREATE TABLE IF NOT EXISTS organizations (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     name VARCHAR(255) NOT NULL,
@@ -12,7 +10,6 @@ CREATE TABLE IF NOT EXISTS organizations (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- 2. Employees Table
 CREATE TABLE IF NOT EXISTS employees (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     org_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
@@ -28,14 +25,13 @@ CREATE TABLE IF NOT EXISTS employees (
     UNIQUE(org_id, email) 
 );
 
--- 3. The Multi-Tenant X-Factor: Row Level Security
 ALTER TABLE employees ENABLE ROW LEVEL SECURITY;
 
--- Create the RLS Policy
+DROP POLICY IF EXISTS org_isolation_policy ON employees;
+
 CREATE POLICY org_isolation_policy ON employees
     USING (org_id = nullif(current_setting('app.current_org_id', true), '')::uuid);
 
--- 4. Indexes for Performance
 CREATE INDEX IF NOT EXISTS idx_employees_org_id ON employees(org_id);
 CREATE INDEX IF NOT EXISTS idx_employee_skills ON employees USING GIN (skills);
 CREATE INDEX IF NOT EXISTS idx_active_employees ON employees (org_id) WHERE status = 'active';
