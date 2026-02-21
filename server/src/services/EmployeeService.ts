@@ -1,9 +1,9 @@
-import EmployeeRepository from '../repositories/EmployeeRepository';
+import EmployeeRepository, { IEmployeeQueryParams } from '../repositories/EmployeeRepository';
 import { IEmployee } from '../interfaces/employee.interface';
 
 export class EmployeeService {
   
-  public async addEmployee(orgId: string, employeeData: any) {
+  public async addEmployee(orgId: string, employeeData: any): Promise<IEmployee> {
     const existingEmployee = await EmployeeRepository.findByEmail(employeeData.email);
     if (existingEmployee) {
       throw new Error('An employee with this email already exists in the system.');
@@ -24,8 +24,31 @@ export class EmployeeService {
     return await EmployeeRepository.create(newEmployee);
   }
 
-  public async getOrgEmployees(orgId: string) {
-    return await EmployeeRepository.findAllByOrg(orgId);
+  // 🚀 UPGRADED: Returns pagination metadata
+  public async getOrgEmployees(orgId: string, params: IEmployeeQueryParams) {
+    return await EmployeeRepository.findAllByOrg(orgId, params);
+  }
+
+  // 🚀 NEW: Update Employee
+  public async updateEmployee(employeeId: string, orgId: string, updates: Partial<IEmployee>): Promise<IEmployee> {
+    if (updates.skills && Array.isArray(updates.skills)) {
+      updates.skills = JSON.stringify(updates.skills) as any;
+    }
+
+    const updatedEmployee = await EmployeeRepository.update(employeeId, orgId, updates);
+    if (!updatedEmployee) {
+      throw new Error('Employee not found or you do not have permission to update.');
+    }
+    
+    return updatedEmployee;
+  }
+
+  // 🚀 NEW: Delete Employee
+  public async deleteEmployee(employeeId: string, orgId: string): Promise<void> {
+    const isDeleted = await EmployeeRepository.delete(employeeId, orgId);
+    if (!isDeleted) {
+      throw new Error('Employee not found or you do not have permission to delete.');
+    }
   }
 }
 

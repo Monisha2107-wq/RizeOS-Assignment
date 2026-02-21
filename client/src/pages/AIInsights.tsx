@@ -1,107 +1,125 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { BrainCircuit, TrendingUp, TrendingDown, Minus, Trophy } from 'lucide-react';
 import api from '../api/axios';
-import { BrainCircuit, TrendingUp, TrendingDown, Minus, Award } from 'lucide-react';
+
+// Shadcn UI
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Progress } from '@/components/ui/progress';
+import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
 
 export default function AIInsights() {
-  const [scores, setScores] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    const fetchScores = async () => {
-      try {
-        const res = await api.get('/ai/scores');
-        setScores(res.data.data);
-      } catch (error) {
-        console.error("Failed to fetch AI scores", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    fetchScores();
-  }, []);
+  const { data: scores = [], isLoading } = useQuery({
+    queryKey: ['ai-scores'],
+    queryFn: async () => {
+      const res = await api.get('/ai/scores');
+      return res.data.data || [];
+    }
+  });
 
   const getTrendIcon = (trend: string) => {
     switch(trend) {
-      case 'up': return <TrendingUp className="w-5 h-5 text-emerald-400" />;
-      case 'down': return <TrendingDown className="w-5 h-5 text-red-400" />;
-      default: return <Minus className="w-5 h-5 text-slate-400" />;
+      case 'up': return <TrendingUp className="w-4 h-4 text-emerald-500" />;
+      case 'down': return <TrendingDown className="w-4 h-4 text-destructive" />;
+      default: return <Minus className="w-4 h-4 text-muted-foreground" />;
     }
   };
 
   return (
     <div className="space-y-6 max-w-6xl mx-auto">
       
-      <div className="flex items-center justify-between mb-8 border-b border-[#334155] pb-6">
+      {/* HEADER */}
+      <div className="flex items-center justify-between pb-4 border-b border-border">
         <div>
-          <h1 className="text-2xl font-bold text-white flex items-center">
-            <BrainCircuit className="w-7 h-7 text-indigo-500 mr-3" />
+          <h1 className="text-3xl font-bold tracking-tight text-foreground flex items-center">
+            <BrainCircuit className="w-8 h-8 text-primary mr-3" />
             AI Workforce Intelligence
           </h1>
-          <p className="text-slate-400 text-sm mt-1">
-            Real-time productivity scoring based on task completion algorithms.
+          <p className="text-muted-foreground text-sm mt-1">
+            Real-time productivity scoring based on smart task completion algorithms.
           </p>
         </div>
       </div>
 
       {isLoading ? (
-        <div className="text-slate-400 animate-pulse">Running AI analysis...</div>
+        <Card>
+          <CardHeader><Skeleton className="h-6 w-48" /></CardHeader>
+          <CardContent className="space-y-4">
+            {[1, 2, 3].map(i => <Skeleton key={i} className="h-12 w-full" />)}
+          </CardContent>
+        </Card>
       ) : scores.length === 0 ? (
-        <div className="bg-[#1e293b] border border-dashed border-[#334155] rounded-xl p-12 text-center">
-          <BrainCircuit className="w-12 h-12 text-slate-500 mx-auto mb-4 opacity-50" />
-          <h3 className="text-lg font-medium text-white mb-1">No Data Available Yet</h3>
-          <p className="text-slate-400 text-sm max-w-md mx-auto">
-            The AI engine requires employees to complete tasks before it can generate a productivity score. Assign and complete a task to see insights here!
-          </p>
-        </div>
+        <Card className="border-dashed bg-muted/10">
+          <CardContent className="flex flex-col items-center justify-center py-16 text-center">
+            <BrainCircuit className="w-12 h-12 text-muted-foreground/50 mb-4" />
+            <h3 className="text-lg font-medium text-foreground mb-2">No Data Available Yet</h3>
+            <p className="text-sm text-muted-foreground max-w-md">
+              The AI engine requires employees to complete tasks before it can generate a productivity score. Assign and complete a task to see insights here!
+            </p>
+          </CardContent>
+        </Card>
       ) : (
-        <div className="bg-[#1e293b] rounded-xl border border-[#334155] overflow-hidden shadow-xl">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-[#0f172a]/50 text-slate-300 text-sm uppercase tracking-wider">
-                <th className="p-4 font-semibold border-b border-[#334155]">Employee Rank</th>
-                <th className="p-4 font-semibold border-b border-[#334155]">Role</th>
-                <th className="p-4 font-semibold border-b border-[#334155]">AI Productivity Score</th>
-                <th className="p-4 font-semibold border-b border-[#334155]">Completion Rate</th>
-                <th className="p-4 font-semibold border-b border-[#334155]">Trend</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[#334155]">
-              {scores.map((score, index) => (
-                <tr key={index} className="hover:bg-[#334155]/20 transition-colors">
-                  <td className="p-4">
-                    <div className="flex items-center">
-                      {index === 0 && <Award className="w-5 h-5 text-amber-400 mr-2" />}
-                      <span className={`font-medium ${index === 0 ? 'text-amber-400' : 'text-white'}`}>
-                        {index + 1}. {score.name}
-                      </span>
-                    </div>
-                  </td>
-                  <td className="p-4 text-slate-400 text-sm">{score.role}</td>
-                  <td className="p-4">
-                    <div className="flex items-center">
-                      <div className="w-full bg-[#0f172a] rounded-full h-2.5 mr-3 max-w-[100px] border border-[#334155]">
-                        <div 
-                          className="bg-indigo-500 h-2.5 rounded-full" 
-                          style={{ width: `${Math.min(100, Math.max(0, score.productivity_score))}%` }}
-                        ></div>
-                      </div>
-                      <span className="font-bold text-white">{parseFloat(score.productivity_score).toFixed(0)}/100</span>
-                    </div>
-                  </td>
-                  <td className="p-4 text-slate-300">
-                    {(parseFloat(score.task_completion_rate) * 100).toFixed(0)}%
-                  </td>
-                  <td className="p-4">
-                    <div className="flex items-center space-x-2">
-                      {getTrendIcon(score.trend)}
-                      <span className="text-sm text-slate-400 capitalize">{score.trend}</span>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <Card className="shadow-sm border-border overflow-hidden">
+          <CardHeader className="bg-muted/30 pb-4">
+            <CardTitle>Leaderboard</CardTitle>
+            <CardDescription>Rankings based on speed, complexity, and volume of tasks completed.</CardDescription>
+          </CardHeader>
+          <CardContent className="p-0">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-muted/50 hover:bg-muted/50">
+                  <TableHead className="w-[50px] text-center">Rank</TableHead>
+                  <TableHead>Employee</TableHead>
+                  <TableHead>Role</TableHead>
+                  <TableHead className="text-right">Productivity Score</TableHead>
+                  <TableHead className="text-right">Completion Rate</TableHead>
+                  <TableHead className="text-right pr-6">Trend</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {scores.map((score: any, index: number) => {
+                  const numScore = parseFloat(score.productivity_score) || 0;
+                  const clampedScore = Math.min(100, Math.max(0, numScore));
+                  const isTop = index === 0;
+
+                  return (
+                    <TableRow key={index} className="transition-colors hover:bg-muted/30">
+                      <TableCell className="text-center font-medium">
+                        {isTop ? (
+                          <Trophy className="w-5 h-5 text-amber-500 mx-auto" />
+                        ) : (
+                          <span className="text-muted-foreground">{index + 1}</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="font-medium">
+                        {score.name}
+                        {isTop && <Badge variant="outline" className="ml-2 bg-amber-500/10 text-amber-600 border-amber-500/20 text-[10px] py-0">Top Performer</Badge>}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground text-sm">{score.role}</TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end gap-3">
+                          <Progress value={clampedScore} className="h-2 w-[100px]" />
+                          <span className="font-bold w-12">{clampedScore.toFixed(0)}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right text-muted-foreground font-mono text-sm">
+                        {(parseFloat(score.task_completion_rate || 0) * 100).toFixed(0)}%
+                      </TableCell>
+                      <TableCell className="text-right pr-6">
+                        <div className="flex items-center justify-end gap-1.5">
+                          {getTrendIcon(score.trend)}
+                          <span className="text-xs text-muted-foreground uppercase font-medium">{score.trend}</span>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
       )}
     </div>
   );

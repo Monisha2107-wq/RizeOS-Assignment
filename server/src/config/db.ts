@@ -12,9 +12,7 @@ class Database {
       connectionString: process.env.DATABASE_URL,
     });
 
-    this.pool.on('connect', () => {
-      console.log('Successfully connected to PostgreSQL Database');
-    });
+    this.pool.on('connect', () => { });
 
     this.pool.on('error', (err) => {
       console.error('Unexpected error on idle client', err);
@@ -36,6 +34,10 @@ class Database {
     } finally {
       client.release();
     }
+  }
+
+  public async end(): Promise<void> {
+    await this.pool.end();
   }
 }
 

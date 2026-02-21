@@ -1,118 +1,160 @@
-import React, { useState } from 'react';
-import { X } from 'lucide-react';
+import React from 'react';
+import { z } from 'zod';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
 import api from '../../api/axios';
+
+// Shadcn Components
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { ScrollArea } from '@/components/ui/scroll-area';
+
+// 1. ZOD SCHEMA for Validation
+const employeeSchema = z.object({
+  name: z.string().min(2, "Name must be at least 2 characters"),
+  email: z.string().email("Invalid email address"),
+  role: z.string().min(2, "Role is required"),
+  department: z.string().optional(),
+  skills: z.string().optional(),
+  wallet_address: z.string().optional(),
+});
+
+type EmployeeFormValues = z.infer<typeof employeeSchema>;
 
 interface AddEmployeeModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSuccess: () => void;
 }
 
-export default function AddEmployeeModal({ isOpen, onClose, onSuccess }: AddEmployeeModalProps) {
-  const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    role: '',
-    department: '',
-    skills: '',
-    wallet_address: ''
+export default function AddEmployeeModal({ isOpen, onClose }: AddEmployeeModalProps) {
+  const queryClient = useQueryClient();
+
+  const form = useForm<EmployeeFormValues>({
+    resolver: zodResolver(employeeSchema),
+    defaultValues: {
+      name: '',
+      email: '',
+      role: '',
+      department: '',
+      skills: '',
+      wallet_address: '',
+    },
   });
-  
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState('');
 
-  if (!isOpen) return null;
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
-    setError('');
-
-    try {
-      const skillsArray = formData.skills
-        .split(',')
-        .map(skill => skill.trim())
-        .filter(skill => skill.length > 0);
-
-      const payload = {
-        ...formData,
-        skills: skillsArray
-      };
-
-      await api.post('/employees', payload);
-      
-      setFormData({ name: '', email: '', role: '', department: '', skills: '', wallet_address: '' });
-      onSuccess();
-    } catch (err: any) {
-      setError(err.response?.data?.message || err.response?.data?.errors?.[0]?.message || 'Failed to add employee.');
-    } finally {
-      setIsLoading(false);
+  const handleOpenChange = (open: boolean) => {
+    if (!open) {
+      form.reset();
+      onClose();
     }
   };
 
+  const createEmployeeMutation = useMutation({
+    mutationFn: async (data: EmployeeFormValues) => {
+      // Parse comma-separated skills into an array
+      const skillsArray = data.skills
+        ? data.skills.split(',').map(s => s.trim()).filter(Boolean)
+        : [];
+      
+      const payload = { ...data, skills: skillsArray };
+      return await api.post('/employees', payload);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['employees'] });
+      toast.success("Employee added successfully!");
+      handleOpenChange(false);
+    },
+    onError: (err: any) => {
+      toast.error(err.response?.data?.message || err.response?.data?.errors?.[0]?.message || 'Failed to add employee.');
+    }
+  });
+
+  const onSubmit = (data: EmployeeFormValues) => {
+    createEmployeeMutation.mutate(data);
+  };
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="bg-[#1e293b] rounded-xl border border-[#334155] w-full max-w-lg shadow-2xl overflow-hidden">
-        
-        <div className="flex justify-between items-center p-6 border-b border-[#334155]">
-          <h2 className="text-xl font-bold text-white">Add New Employee</h2>
-          <button onClick={onClose} className="text-slate-400 hover:text-white transition-colors">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
+    <Dialog open={isOpen} onOpenChange={handleOpenChange}>
+      <DialogContent className="sm:max-w-[500px] p-0 overflow-hidden bg-background">
+        <DialogHeader className="px-6 pt-6 pb-4 border-b">
+          <DialogTitle className="text-xl">Add New Employee</DialogTitle>
+          <DialogDescription>Add a new member to your organization's workforce.</DialogDescription>
+        </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          {error && <div className="p-3 bg-red-500/10 border border-red-500/50 rounded text-red-400 text-sm">{error}</div>}
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col max-h-[70vh]">
+            <ScrollArea className="px-6 py-4">
+              <div className="space-y-4 pr-2">
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField control={form.control} name="name" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Full Name <span className="text-destructive">*</span></FormLabel>
+                      <FormControl><Input placeholder="Jane Doe" {...field} /></FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-slate-300 mb-1">Full Name *</label>
-              <input type="text" required value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})}
-                className="w-full px-3 py-2 bg-[#0f172a] border border-[#334155] rounded-lg text-white focus:outline-none focus:border-indigo-500" placeholder="Jane Doe" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-300 mb-1">Email *</label>
-              <input type="email" required value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})}
-                className="w-full px-3 py-2 bg-[#0f172a] border border-[#334155] rounded-lg text-white focus:outline-none focus:border-indigo-500" placeholder="jane@company.com" />
-            </div>
-          </div>
+                  <FormField control={form.control} name="email" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Email <span className="text-destructive">*</span></FormLabel>
+                      <FormControl><Input placeholder="jane@company.com" {...field} /></FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-slate-300 mb-1">Role *</label>
-              <input type="text" required value={formData.role} onChange={e => setFormData({...formData, role: e.target.value})}
-                className="w-full px-3 py-2 bg-[#0f172a] border border-[#334155] rounded-lg text-white focus:outline-none focus:border-indigo-500" placeholder="Frontend Dev" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-300 mb-1">Department</label>
-              <input type="text" value={formData.department} onChange={e => setFormData({...formData, department: e.target.value})}
-                className="w-full px-3 py-2 bg-[#0f172a] border border-[#334155] rounded-lg text-white focus:outline-none focus:border-indigo-500" placeholder="Engineering" />
-            </div>
-          </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField control={form.control} name="role" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Role <span className="text-destructive">*</span></FormLabel>
+                      <FormControl><Input placeholder="Frontend Dev" {...field} /></FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
 
-          <div>
-            <label className="block text-sm font-medium text-slate-300 mb-1">Skills (comma separated)</label>
-            <input type="text" value={formData.skills} onChange={e => setFormData({...formData, skills: e.target.value})}
-              className="w-full px-3 py-2 bg-[#0f172a] border border-[#334155] rounded-lg text-white focus:outline-none focus:border-indigo-500" placeholder="React, TypeScript, Node" />
-          </div>
+                  <FormField control={form.control} name="department" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Department</FormLabel>
+                      <FormControl><Input placeholder="Engineering" {...field} /></FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                </div>
 
-          <div>
-            <label className="block text-sm font-medium text-slate-300 mb-1">Wallet Address (Optional)</label>
-            <input type="text" value={formData.wallet_address} onChange={e => setFormData({...formData, wallet_address: e.target.value})}
-              className="w-full px-3 py-2 bg-[#0f172a] border border-[#334155] rounded-lg text-white focus:outline-none focus:border-indigo-500" placeholder="0x..." />
-          </div>
+                <FormField control={form.control} name="skills" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Skills (comma separated)</FormLabel>
+                    <FormControl><Input placeholder="React, Node.js, Design" {...field} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
 
-          <div className="pt-4 flex justify-end space-x-3">
-            <button type="button" onClick={onClose} className="px-4 py-2 rounded-lg text-slate-300 hover:bg-[#334155] transition-colors">
-              Cancel
-            </button>
-            <button type="submit" disabled={isLoading} className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-medium transition-colors disabled:opacity-50">
-              {isLoading ? 'Saving...' : 'Add Employee'}
-            </button>
-          </div>
-        </form>
+                <FormField control={form.control} name="wallet_address" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Wallet Address (Optional)</FormLabel>
+                    <FormControl><Input className="font-mono text-sm" placeholder="0x..." {...field} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
 
-      </div>
-    </div>
+              </div>
+            </ScrollArea>
+
+            <DialogFooter className="px-6 py-4 border-t bg-muted/40">
+              <Button type="button" variant="ghost" onClick={() => handleOpenChange(false)}>Cancel</Button>
+              <Button type="submit" disabled={createEmployeeMutation.isPending}>
+                {createEmployeeMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                {createEmployeeMutation.isPending ? 'Adding...' : 'Add Employee'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </Form>
+      </DialogContent>
+    </Dialog>
   );
 }

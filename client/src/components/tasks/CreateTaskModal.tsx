@@ -1,6 +1,30 @@
 import React, { useState } from 'react';
-import { X, Sparkles, UserCheck } from 'lucide-react';
+import { z } from 'zod';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { Sparkles, UserCheck, Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
 import api from '../../api/axios';
+
+// Shadcn UI Components
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Badge } from '@/components/ui/badge';
+
+// 1. ZOD SCHEMA
+const taskSchema = z.object({
+  title: z.string().min(3, "Title must be at least 3 characters"),
+  priority: z.enum(['low', 'medium', 'high']),
+  required_skills: z.string().optional(),
+  assigned_to: z.string().optional(),
+});
+
+type TaskFormValues = z.infer<typeof taskSchema>;
 
 interface CreateTaskModalProps {
   isOpen: boolean;
@@ -9,149 +33,217 @@ interface CreateTaskModalProps {
 }
 
 export default function CreateTaskModal({ isOpen, onClose, onSuccess }: CreateTaskModalProps) {
-  const [formData, setFormData] = useState({
-    title: '',
-    description: '',
-    priority: 'medium',
-    required_skills: '',
-    assigned_to: ''
+  const queryClient = useQueryClient();
+  const [aiRecommendations, setAiRecommendations] = useState<any[]>([]);
+
+  // 2. FORM SETUP
+  const form = useForm<TaskFormValues>({
+    resolver: zodResolver(taskSchema),
+    defaultValues: {
+      title: '',
+      priority: 'medium',
+      required_skills: '',
+      assigned_to: '',
+    },
   });
 
-  const [aiRecommendations, setAiRecommendations] = useState<any[]>([]);
-  const [isAiLoading, setIsAiLoading] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState('');
-
-  if (!isOpen) return null;
-
-  const fetchAIRecommendations = async () => {
-    if (!formData.required_skills) {
-      setError("Please enter required skills first to get AI recommendations.");
-      return;
-    }
-    
-    setIsAiLoading(true);
-    setError('');
-    
-    try {
-      const skillsArray = formData.required_skills.split(',').map(s => s.trim()).filter(s => s);
-      const res = await api.post('/ai/smart-assign', { required_skills: skillsArray });
-      setAiRecommendations(res.data.data);
-    } catch (err: any) {
-      setError("Failed to fetch AI recommendations.");
-    } finally {
-      setIsAiLoading(false);
+  const handleOpenChange = (open: boolean) => {
+    if (!open) {
+      form.reset();
+      setAiRecommendations([]);
+      onClose();
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSubmitting(true);
-    setError('');
-
-    try {
-      const skillsArray = formData.required_skills.split(',').map(s => s.trim()).filter(s => s);
-      const payload = { ...formData, required_skills: skillsArray };
+  // 3. MUTATIONS
+  const createTaskMutation = useMutation({
+    mutationFn: async (data: TaskFormValues) => {
+      const skillsArray = data.required_skills
+        ? data.required_skills.split(',').map(s => s.trim()).filter(Boolean)
+        : [];
       
-      if (!payload.assigned_to) delete (payload as any).assigned_to;
+      const payload: any = { ...data, required_skills: skillsArray };
+      if (!payload.assigned_to) delete payload.assigned_to; 
 
-      await api.post('/tasks', payload);
-      
-      setFormData({ title: '', description: '', priority: 'medium', required_skills: '', assigned_to: '' });
-      setAiRecommendations([]);
-      onSuccess();
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to create task.');
-    } finally {
-      setIsSubmitting(false);
+      return await api.post('/tasks', payload);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      onSuccess(); 
+      handleOpenChange(false);
+    },
+    onError: (err: any) => {
+      toast.error(err.response?.data?.message || 'Failed to create task.');
     }
+  });
+
+  const askAiMutation = useMutation({
+    mutationFn: async (skills: string) => {
+      const skillsArray = skills.split(',').map(s => s.trim()).filter(Boolean);
+      const res = await api.post('/ai/smart-assign', { required_skills: skillsArray });
+      return res.data.data;
+    },
+    onSuccess: (data) => {
+      setAiRecommendations(data);
+      if (data.length === 0) toast.info("No highly matched employees found.");
+      else toast.success("AI generated matching recommendations!");
+    },
+    onError: () => {
+      toast.error("Failed to fetch AI recommendations.");
+    }
+  });
+
+  const handleAiClick = () => {
+    const skills = form.getValues('required_skills');
+    if (!skills) {
+      form.setError('required_skills', { type: 'manual', message: 'Enter required skills first (e.g., React, Node)' });
+      return;
+    }
+    askAiMutation.mutate(skills);
+  };
+
+  const onSubmit = (data: TaskFormValues) => {
+    createTaskMutation.mutate(data);
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-      <div className="bg-[#1e293b] rounded-xl border border-[#334155] w-full max-w-2xl shadow-2xl flex flex-col max-h-[90vh]">
+    <Dialog open={isOpen} onOpenChange={handleOpenChange}>
+      <DialogContent className="sm:max-w-[600px] p-0 overflow-hidden bg-background">
         
-        <div className="flex justify-between items-center p-6 border-b border-[#334155]">
-          <h2 className="text-xl font-bold text-white flex items-center">
-            Create Task
-          </h2>
-          <button onClick={onClose} className="text-slate-400 hover:text-white">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
+        {/* FIXED HEADER */}
+        <DialogHeader className="px-6 pt-6 pb-4 border-b">
+          <DialogTitle className="text-xl">Create Task</DialogTitle>
+          <DialogDescription>Assign a new task to your workforce or let AI find the perfect match.</DialogDescription>
+        </DialogHeader>
 
-        <div className="flex-1 overflow-y-auto p-6">
-          <form id="create-task-form" onSubmit={handleSubmit} className="space-y-4">
-            {error && <div className="p-3 bg-red-500/10 border border-red-500/50 rounded text-red-400 text-sm">{error}</div>}
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col">
+            
+            {/* 🚀 FIXED: Explicit max-height on ScrollArea ensures the scrollbar actually appears! */}
+            <ScrollArea className="max-h-[60vh] w-full">
+              <div className="px-6 py-4 space-y-5">
+                
+                <FormField control={form.control} name="title" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Task Title <span className="text-destructive">*</span></FormLabel>
+                    <FormControl>
+                      <Input placeholder="e.g. Build Dashboard UI" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
 
-            <div>
-              <label className="block text-sm font-medium text-slate-300 mb-1">Task Title *</label>
-              <input type="text" required value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})}
-                className="w-full px-3 py-2 bg-[#0f172a] border border-[#334155] rounded-lg text-white focus:border-indigo-500 outline-none" placeholder="Build Dashboard UI" />
-            </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField control={form.control} name="priority" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Priority</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select priority" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="low">Low</SelectItem>
+                          <SelectItem value="medium">Medium</SelectItem>
+                          <SelectItem value="high">High</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
 
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-300 mb-1">Priority</label>
-                <select value={formData.priority} onChange={e => setFormData({...formData, priority: e.target.value})}
-                  className="w-full px-3 py-2 bg-[#0f172a] border border-[#334155] rounded-lg text-white focus:border-indigo-500 outline-none">
-                  <option value="low">Low</option>
-                  <option value="medium">Medium</option>
-                  <option value="high">High</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-300 mb-1">Required Skills</label>
-                <input type="text" value={formData.required_skills} onChange={e => setFormData({...formData, required_skills: e.target.value})}
-                  className="w-full px-3 py-2 bg-[#0f172a] border border-[#334155] rounded-lg text-white focus:border-indigo-500 outline-none" placeholder="React, Node" />
-              </div>
-            </div>
-
-            <div className="pt-4 border-t border-[#334155]">
-              <div className="flex justify-between items-end mb-3">
-                <label className="block text-sm font-medium text-slate-300">Assign To (Employee ID)</label>
-                <button type="button" onClick={fetchAIRecommendations} disabled={isAiLoading}
-                  className="flex items-center text-sm px-3 py-1.5 bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500/20 rounded-md transition-colors border border-indigo-500/30">
-                  <Sparkles className="w-4 h-4 mr-1.5" />
-                  {isAiLoading ? 'Analyzing...' : 'Ask AI for Recommendations'}
-                </button>
-              </div>
-
-              <input type="text" value={formData.assigned_to} onChange={e => setFormData({...formData, assigned_to: e.target.value})}
-                className="w-full px-3 py-2 bg-[#0f172a] border border-[#334155] rounded-lg text-slate-400 focus:border-indigo-500 outline-none mb-3 font-mono text-sm" placeholder="Paste Employee UUID here or select below" />
-
-              {aiRecommendations.length > 0 && (
-                <div className="space-y-2 mt-2">
-                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Top AI Matches</p>
-                  {aiRecommendations.map((rec, idx) => (
-                    <div key={idx} onClick={() => setFormData({...formData, assigned_to: rec.employee_id})}
-                      className={`p-3 rounded-lg border cursor-pointer transition-colors flex justify-between items-center
-                        ${formData.assigned_to === rec.employee_id ? 'bg-indigo-600/20 border-indigo-500' : 'bg-[#0f172a] border-[#334155] hover:border-slate-500'}`}>
-                      <div>
-                        <div className="font-medium text-white text-sm">{rec.name} <span className="text-slate-500 font-normal">({rec.role})</span></div>
-                        <div className="text-xs text-slate-400 mt-1">{rec.explanation}</div>
-                      </div>
-                      <div className="flex flex-col items-end">
-                        <span className={`text-sm font-bold ${rec.match_score >= 80 ? 'text-emerald-400' : 'text-amber-400'}`}>
-                          {rec.match_score}% Match
-                        </span>
-                        {formData.assigned_to === rec.employee_id && <UserCheck className="w-4 h-4 text-indigo-400 mt-1" />}
-                      </div>
-                    </div>
-                  ))}
+                  <FormField control={form.control} name="required_skills" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Required Skills</FormLabel>
+                      <FormControl>
+                        <Input placeholder="React, Node.js" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
                 </div>
-              )}
-            </div>
-          </form>
-        </div>
 
-        <div className="p-4 border-t border-[#334155] flex justify-end space-x-3 bg-[#1e293b]">
-          <button type="button" onClick={onClose} className="px-4 py-2 text-slate-300 hover:bg-[#334155] rounded-lg transition-colors">Cancel</button>
-          <button type="submit" form="create-task-form" disabled={isSubmitting} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors disabled:opacity-50">
-            {isSubmitting ? 'Creating...' : 'Create Task'}
-          </button>
-        </div>
-      </div>
-    </div>
+                <div className="pt-4 border-t border-border mt-2">
+                  <div className="flex justify-between items-end mb-3">
+                    <FormLabel className="mb-0">Assign To (Employee UUID)</FormLabel>
+                    <Button 
+                      type="button" 
+                      variant="secondary" 
+                      size="sm" 
+                      onClick={handleAiClick}
+                      disabled={askAiMutation.isPending}
+                      className="h-8 text-xs bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-500/20"
+                    >
+                      {askAiMutation.isPending ? (
+                        <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                      ) : (
+                        <Sparkles className="w-3.5 h-3.5 mr-1.5" />
+                      )}
+                      {askAiMutation.isPending ? 'Analyzing...' : 'Ask AI'}
+                    </Button>
+                  </div>
+
+                  <FormField control={form.control} name="assigned_to" render={({ field }) => (
+                    <FormItem>
+                      <FormControl>
+                        <Input className="font-mono text-sm" placeholder="Paste UUID or select below" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+
+                  {/* AI Recommendations List */}
+                  {aiRecommendations.length > 0 && (
+                    <div className="space-y-2 mt-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                      <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-2">Top AI Matches</p>
+                      {aiRecommendations.map((rec, idx) => {
+                        const isSelected = form.watch('assigned_to') === rec.employee_id;
+                        return (
+                          <div 
+                            key={idx} 
+                            onClick={() => form.setValue('assigned_to', rec.employee_id, { shouldValidate: true })}
+                            className={`p-3 rounded-lg border cursor-pointer transition-all flex justify-between items-center group
+                              ${isSelected 
+                                ? 'bg-indigo-500/10 border-indigo-500 dark:border-indigo-400' 
+                                : 'bg-card hover:border-primary border-border'
+                              }`}
+                          >
+                            <div className="flex-1 pr-4">
+                              <div className="font-medium text-foreground text-sm flex items-center gap-2">
+                                {rec.name}
+                                <Badge variant="secondary" className="text-[10px] py-0 px-1 font-normal h-4">{rec.role}</Badge>
+                              </div>
+                              <div className="text-xs text-muted-foreground mt-1 line-clamp-2">{rec.explanation}</div>
+                            </div>
+                            <div className="flex flex-col items-end shrink-0">
+                              <span className={`text-sm font-bold ${rec.match_score >= 80 ? 'text-emerald-500' : 'text-amber-500'}`}>
+                                {rec.match_score}% Match
+                              </span>
+                              {isSelected && <UserCheck className="w-4 h-4 text-indigo-500 mt-1 animate-in zoom-in" />}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </ScrollArea>
+
+            {/* FIXED FOOTER */}
+            <DialogFooter className="px-6 py-4 border-t bg-muted/40">
+              <Button type="button" variant="ghost" onClick={() => handleOpenChange(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={createTaskMutation.isPending}>
+                {createTaskMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                {createTaskMutation.isPending ? 'Creating...' : 'Create Task'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </Form>
+      </DialogContent>
+    </Dialog>
   );
 }

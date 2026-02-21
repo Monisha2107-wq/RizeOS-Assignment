@@ -1,134 +1,276 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
+import { 
+  Plus, 
+  MoreHorizontal, 
+  Search, 
+  Clock, 
+  CheckCircle2, 
+  ArrowRight,
+  CircleDashed,
+  AlertCircle
+} from 'lucide-react';
 import api from '../api/axios';
 import CreateTaskModal from '../components/tasks/CreateTaskModal';
-import { Plus, Clock, CheckCircle2, ArrowRight } from 'lucide-react';
+
+// Shadcn UI Components
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 
 export default function Tasks() {
-  const [tasks, setTasks] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  
+  const queryClient = useQueryClient();
 
-  const fetchTasks = async () => {
-    setIsLoading(true);
-    try {
+  // 1. DATA FETCHING
+  const { data: tasks = [], isLoading } = useQuery({
+    queryKey: ['tasks'],
+    queryFn: async () => {
       const res = await api.get('/tasks');
-      setTasks(res.data.data);
-    } catch (err) {
-      console.error("Failed to fetch tasks", err);
-    } finally {
-      setIsLoading(false);
+      return res.data.data || []; 
     }
-  };
+  });
 
-  useEffect(() => {
-    fetchTasks();
-  }, []);
-
-  const updateStatus = async (taskId: string, newStatus: string) => {
-    try {
-      setTasks(tasks.map(t => t.id === taskId ? { ...t, status: newStatus } : t));
-      
+  // 2. MUTATION: Update Status
+  const updateStatusMutation = useMutation({
+    mutationFn: async ({ taskId, newStatus }: { taskId: string, newStatus: string }) => {
       await api.patch(`/tasks/${taskId}/status`, { status: newStatus });
-    } catch (err) {
-      console.error("Failed to update status", err);
-      fetchTasks();
+    },
+    onMutate: async ({ taskId, newStatus }) => {
+      await queryClient.cancelQueries({ queryKey: ['tasks'] });
+      const previousTasks = queryClient.getQueryData(['tasks']);
+      queryClient.setQueryData(['tasks'], (old: any) => 
+        old?.map((t: any) => t.id === taskId ? { ...t, status: newStatus } : t)
+      );
+      return { previousTasks };
+    },
+    onError: (err, newTodo, context) => {
+      queryClient.setQueryData(['tasks'], context?.previousTasks);
+      toast.error('Failed to update task status');
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+    },
+    onSuccess: (_, variables) => {
+      toast.success(`Task status updated`);
     }
+  });
+
+  const updateStatus = (taskId: string, newStatus: string) => {
+    updateStatusMutation.mutate({ taskId, newStatus });
   };
 
-  const getPriorityColor = (priority: string) => {
+  // 3. FILTERING LOGIC
+  const filteredTasks = tasks.filter((task: any) => {
+    const matchesSearch = task.title.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesStatus = statusFilter === 'all' || task.status === statusFilter;
+    return matchesSearch && matchesStatus;
+  });
+
+  // 4. UI HELPERS
+  const getPriorityBadge = (priority: string) => {
     switch(priority) {
-      case 'high': return 'text-red-400 bg-red-400/10 border-red-400/20';
-      case 'medium': return 'text-amber-400 bg-amber-400/10 border-amber-400/20';
-      case 'low': return 'text-emerald-400 bg-emerald-400/10 border-emerald-400/20';
-      default: return 'text-slate-400 bg-slate-400/10 border-slate-400/20';
+      case 'high': return <Badge variant="destructive" className="uppercase text-[10px]">High</Badge>;
+      case 'medium': return <Badge variant="default" className="uppercase text-[10px] bg-amber-500 hover:bg-amber-600 text-white border-transparent">Med</Badge>;
+      case 'low': return <Badge variant="secondary" className="uppercase text-[10px]">Low</Badge>;
+      default: return <Badge variant="outline">Unknown</Badge>;
     }
   };
 
-  const columns = [
-    { id: 'assigned', title: 'Assigned', color: 'border-blue-500' },
-    { id: 'in_progress', title: 'In Progress', color: 'border-amber-500' },
-    { id: 'completed', title: 'Completed', color: 'border-emerald-500' }
-  ];
+  const getStatusDisplay = (status: string) => {
+    switch(status) {
+      case 'assigned': 
+        return <div className="flex items-center text-blue-500 font-medium"><CircleDashed className="w-4 h-4 mr-2" /> Assigned</div>;
+      case 'in_progress': 
+        return <div className="flex items-center text-amber-500 font-medium"><Clock className="w-4 h-4 mr-2" /> In Progress</div>;
+      case 'completed': 
+        return <div className="flex items-center text-emerald-500 font-medium"><CheckCircle2 className="w-4 h-4 mr-2" /> Completed</div>;
+      default: 
+        return <div className="flex items-center text-muted-foreground"><AlertCircle className="w-4 h-4 mr-2" /> Unknown</div>;
+    }
+  };
+
+  const safelyParseJSON = (data: any) => {
+    if (!data) return [];
+    if (Array.isArray(data)) return data;
+    try { return JSON.parse(data); } catch { return []; }
+  };
 
   return (
-    <div className="h-full flex flex-col">
-      <div className="flex justify-between items-center mb-6">
+    <div className="h-full flex flex-col space-y-6 max-w-[1400px] mx-auto">
+      
+      {/* HEADER */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-white">Task Board</h1>
-          <p className="text-slate-400 text-sm mt-1">Manage and track workforce assignments.</p>
+          <h1 className="text-3xl font-bold tracking-tight text-foreground">Tasks Directory</h1>
+          <p className="text-muted-foreground text-sm mt-1">Manage, filter, and track workforce assignments at scale.</p>
         </div>
-        <button onClick={() => setIsModalOpen(true)} className="flex items-center px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors">
-          <Plus className="w-5 h-5 mr-1" /> Create Task
-        </button>
+        <Button onClick={() => setIsModalOpen(true)}>
+          <Plus className="w-4 h-4 mr-2" /> Create Task
+        </Button>
       </div>
 
-      {isLoading ? (
-        <div className="text-slate-400">Loading tasks...</div>
-      ) : (
-        <div className="flex-1 flex gap-6 overflow-x-auto pb-4">
-          {columns.map(col => (
-            <div key={col.id} className="flex-1 min-w-[320px] bg-[#1e293b]/50 rounded-xl border border-[#334155] flex flex-col">
-              
-              <div className={`p-4 border-b border-[#334155] border-t-2 ${col.color} rounded-t-xl bg-[#1e293b]`}>
-                <h3 className="font-semibold text-white capitalize">{col.title}</h3>
-                <span className="text-xs text-slate-400">{tasks.filter(t => t.status === col.id).length} Tasks</span>
-              </div>
-
-              <div className="p-4 flex-1 space-y-4 overflow-y-auto">
-                {tasks.filter(t => t.status === col.id).map(task => (
-                  <div key={task.id} className="bg-[#0f172a] p-4 rounded-lg border border-[#334155] shadow-sm">
-                    <div className="flex justify-between items-start mb-2">
-                      <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded border ${getPriorityColor(task.priority)}`}>
-                        {task.priority}
-                      </span>
-                    </div>
-                    
-                    <h4 className="text-white font-medium mb-1">{task.title}</h4>
-                    
-                    <div className="flex flex-wrap gap-1 mb-4 mt-2">
-                      {task.required_skills && safelyParseJSON(task.required_skills).map((skill: string, idx: number) => (
-                        <span key={idx} className="text-[10px] text-slate-400 bg-[#1e293b] px-1.5 py-0.5 rounded">{skill}</span>
-                      ))}
-                    </div>
-
-                    <div className="flex justify-between items-center pt-3 border-t border-[#334155]">
-                      <span className="text-xs text-slate-500 font-mono truncate w-24" title={task.assigned_to}>
-                        {task.assigned_to ? 'Assigned' : 'Unassigned'}
-                      </span>
-                      
-                      <div className="flex space-x-2">
-                        {task.status === 'assigned' && (
-                          <button onClick={() => updateStatus(task.id, 'in_progress')} className="p-1.5 text-slate-400 hover:text-amber-400 hover:bg-amber-400/10 rounded transition-colors" title="Start Task">
-                            <Clock className="w-4 h-4" />
-                          </button>
-                        )}
-                        {task.status === 'in_progress' && (
-                          <button onClick={() => updateStatus(task.id, 'completed')} className="p-1.5 text-slate-400 hover:text-emerald-400 hover:bg-emerald-400/10 rounded transition-colors" title="Complete Task">
-                            <CheckCircle2 className="w-4 h-4" />
-                          </button>
-                        )}
-                        {task.status === 'completed' && (
-                          <button onClick={() => updateStatus(task.id, 'assigned')} className="p-1.5 text-slate-400 hover:text-blue-400 hover:bg-blue-400/10 rounded transition-colors" title="Reopen Task">
-                            <ArrowRight className="w-4 h-4 transform rotate-180" />
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ))}
+      {/* TOOLBAR (Filters & Search) */}
+      <div className="flex flex-col sm:flex-row justify-between gap-4 bg-card p-4 rounded-lg border border-border shadow-sm">
+        <div className="relative w-full sm:max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input 
+            placeholder="Search tasks by title..." 
+            className="pl-9"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
         </div>
-      )}
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="w-full sm:w-[180px]">
+              <SelectValue placeholder="Filter by status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Statuses</SelectItem>
+              <SelectItem value="assigned">Assigned</SelectItem>
+              <SelectItem value="in_progress">In Progress</SelectItem>
+              <SelectItem value="completed">Completed</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
 
-      <CreateTaskModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} onSuccess={() => { setIsModalOpen(false); fetchTasks(); }} />
+      {/* DATA TABLE */}
+      <div className="bg-card border border-border rounded-lg shadow-sm overflow-hidden flex-1">
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader className="bg-muted/50">
+              <TableRow>
+                <TableHead className="w-[40%]">Task Detail</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Priority</TableHead>
+                <TableHead>Assignee ID</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {isLoading ? (
+                // Loading State
+                Array.from({ length: 5 }).map((_, i) => (
+                  <TableRow key={i}>
+                    <TableCell><Skeleton className="h-5 w-[250px]" /><Skeleton className="h-4 w-[150px] mt-2" /></TableCell>
+                    <TableCell><Skeleton className="h-5 w-[100px]" /></TableCell>
+                    <TableCell><Skeleton className="h-5 w-[60px]" /></TableCell>
+                    <TableCell><Skeleton className="h-4 w-[120px]" /></TableCell>
+                    <TableCell className="text-right"><Skeleton className="h-8 w-8 ml-auto rounded-md" /></TableCell>
+                  </TableRow>
+                ))
+              ) : filteredTasks.length === 0 ? (
+                // Empty State
+                <TableRow>
+                  <TableCell colSpan={5} className="h-48 text-center">
+                    <div className="flex flex-col items-center justify-center text-muted-foreground">
+                      <CircleDashed className="h-8 w-8 mb-2 opacity-20" />
+                      <p>No tasks found matching your criteria.</p>
+                      <Button variant="link" onClick={() => {setSearchQuery(''); setStatusFilter('all');}}>Clear filters</Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ) : (
+                // Data Rows
+                filteredTasks.map((task: any) => (
+                  <TableRow key={task.id} className="group hover:bg-muted/30 transition-colors">
+                    
+                    <TableCell>
+                      <div className="font-medium text-foreground">{task.title}</div>
+                      <div className="flex gap-1.5 mt-1.5">
+                        {safelyParseJSON(task.required_skills).map((skill: string, idx: number) => (
+                          <Badge key={idx} variant="secondary" className="text-[10px] px-1.5 py-0 font-normal bg-muted text-muted-foreground">
+                            {skill}
+                          </Badge>
+                        ))}
+                      </div>
+                    </TableCell>
+
+                    <TableCell>
+                      {getStatusDisplay(task.status)}
+                    </TableCell>
+
+                    <TableCell>
+                      {getPriorityBadge(task.priority)}
+                    </TableCell>
+
+                    <TableCell>
+                      <span className="font-mono text-xs text-muted-foreground truncate block max-w-[150px]" title={task.assigned_to}>
+                        {task.assigned_to || 'Unassigned'}
+                      </span>
+                    </TableCell>
+
+                    <TableCell className="text-right">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <span className="sr-only">Open menu</span>
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-[160px]">
+                          <DropdownMenuLabel>Change Status</DropdownMenuLabel>
+                          <DropdownMenuSeparator />
+                          
+                          {task.status !== 'assigned' && (
+                            <DropdownMenuItem onClick={() => updateStatus(task.id, 'assigned')}>
+                              <ArrowRight className="mr-2 h-4 w-4 transform rotate-180" /> Re-Assign
+                            </DropdownMenuItem>
+                          )}
+                          
+                          {task.status !== 'in_progress' && (
+                            <DropdownMenuItem onClick={() => updateStatus(task.id, 'in_progress')}>
+                              <Clock className="mr-2 h-4 w-4" /> Start Task
+                            </DropdownMenuItem>
+                          )}
+                          
+                          {task.status !== 'completed' && (
+                            <DropdownMenuItem onClick={() => updateStatus(task.id, 'completed')}>
+                              <CheckCircle2 className="mr-2 h-4 w-4 text-emerald-500" /> Complete Task
+                            </DropdownMenuItem>
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
+        
+        {/* Pagination Placeholder (Ready for Backend integration later) */}
+        {!isLoading && filteredTasks.length > 0 && (
+          <div className="border-t border-border p-4 flex items-center justify-between text-sm text-muted-foreground bg-muted/20">
+            <div>Showing {filteredTasks.length} of {tasks.length} total tasks</div>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" disabled>Previous</Button>
+              <Button variant="outline" size="sm" disabled>Next</Button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <CreateTaskModal 
+        isOpen={isModalOpen} 
+        onClose={() => setIsModalOpen(false)} 
+        onSuccess={() => { 
+          setIsModalOpen(false); 
+          queryClient.invalidateQueries({ queryKey: ['tasks'] }); 
+          toast.success("Task created successfully!");
+        }} 
+      />
     </div>
   );
 }
-
-const safelyParseJSON = (data: any) => {
-  if (!data) return [];
-  if (Array.isArray(data)) return data;
-  try { return JSON.parse(data); } catch { return []; }
-};

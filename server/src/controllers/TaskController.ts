@@ -3,6 +3,8 @@ import { AuthRequest } from '../middleware/auth.middleware';
 import TaskService from '../services/TaskService';
 import { z } from 'zod';
 
+// --- ZOD SCHEMAS ---
+
 const createTaskSchema = z.object({
   title: z.string().min(3, "Title must be at least 3 characters"),
   description: z.string().optional(),
@@ -14,6 +16,31 @@ const createTaskSchema = z.object({
 const updateStatusSchema = z.object({
   status: z.enum(['assigned', 'in_progress', 'completed'])
 });
+
+// 🚀 NEW: Validation for Query Parameters
+const getTasksQuerySchema = z.object({
+  page: z.coerce.number().min(1).default(1),
+  limit: z.coerce.number().min(1).max(100).default(10), // Max 100 per page to prevent abuse
+  sortBy: z.enum(['created_at', 'updated_at', 'title', 'priority', 'status']).default('created_at'),
+  order: z.enum(['asc', 'desc']).default('desc'),
+  status: z.string().optional(),
+  priority: z.string().optional(),
+  assigned_to: z.string().uuid().optional()
+});
+
+// 🚀 NEW: Validation for Full Edits (All fields optional)
+const updateTaskSchema = z.object({
+  title: z.string().min(3, "Title must be at least 3 characters").optional(),
+  description: z.string().optional(),
+  assigned_to: z.string().uuid("Invalid Employee ID format").optional().nullable(),
+  priority: z.enum(['low', 'medium', 'high']).optional(),
+  required_skills: z.array(z.string()).optional()
+}).refine(data => Object.keys(data).length > 0, {
+  message: "At least one field must be provided to update"
+});
+
+
+// --- CONTROLLER ---
 
 export class TaskController {
   
@@ -35,13 +62,30 @@ export class TaskController {
     }
   }
 
+  // 🚀 UPGRADED: Handles Pagination, Filtering, and Sorting metadata
   public async getTasks(req: AuthRequest, res: Response): Promise<void> {
     try {
       const orgId = req.user!.orgId;
-      const tasks = await TaskService.getOrgTasks(orgId);
-      res.status(200).json({ success: true, data: tasks });
+      const queryParams = getTasksQuerySchema.parse(req.query);
+      
+      const { data, total } = await TaskService.getOrgTasks(orgId, queryParams);
+      
+      res.status(200).json({ 
+        success: true, 
+        data: data,
+        pagination: {
+          total,
+          page: queryParams.page,
+          limit: queryParams.limit,
+          totalPages: Math.ceil(total / queryParams.limit)
+        }
+      });
     } catch (error: any) {
-      res.status(500).json({ success: false, message: 'Failed to fetch tasks' });
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ success: false, errors: error });
+      } else {
+        res.status(500).json({ success: false, message: 'Failed to fetch tasks' });
+      }
     }
   }
 
@@ -60,6 +104,39 @@ export class TaskController {
       } else {
         res.status(404).json({ success: false, message: error.message });
       }
+    }
+  }
+
+  // 🚀 NEW: Update endpoint
+  public async updateTask(req: AuthRequest, res: Response): Promise<void> {
+    try {
+      const orgId = req.user!.orgId;
+      const taskId = req.params.id as string;
+      
+      const validatedData = updateTaskSchema.parse(req.body);
+      const updatedTask = await TaskService.updateTask(taskId, orgId, validatedData);
+
+      res.status(200).json({ success: true, data: updatedTask });
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ success: false, errors: error });
+      } else {
+        res.status(404).json({ success: false, message: error.message });
+      }
+    }
+  }
+
+  // 🚀 NEW: Delete endpoint
+  public async deleteTask(req: AuthRequest, res: Response): Promise<void> {
+    try {
+      const orgId = req.user!.orgId;
+      const taskId = req.params.id as string;
+
+      await TaskService.deleteTask(taskId, orgId);
+
+      res.status(200).json({ success: true, message: 'Task deleted successfully' });
+    } catch (error: any) {
+      res.status(404).json({ success: false, message: error.message });
     }
   }
 }
