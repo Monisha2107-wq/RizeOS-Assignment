@@ -1,17 +1,17 @@
 export interface ITask {
   id?: string;
   org_id: string;
-  assigned_to?: string | null;
-  created_by?: string | null;
   title: string;
   description?: string;
-  priority?: string;
-  status?: string;
-  required_skills?: any; 
-  due_date?: Date;
-  completed_at?: Date;
+  assigned_to?: string | null;
+  created_by?: string;
+  status?: 'assigned' | 'in_progress' | 'completed';
+  priority: 'low' | 'medium' | 'high';
+  deadline?: string | Date | null; 
+  required_skills?: string[] | string;
   created_at?: Date;
   updated_at?: Date;
+  completed_at?: Date | null;
 }
 
 export interface IWeeklyTaskStat {

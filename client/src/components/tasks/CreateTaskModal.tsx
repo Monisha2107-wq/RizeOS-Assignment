@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Sparkles, UserCheck, Loader2 } from 'lucide-react';
+import { Sparkles, UserCheck, Loader2, Calendar } from 'lucide-react';
 import { toast } from 'sonner';
 import api from '../../api/axios';
 
@@ -18,6 +18,7 @@ import { Badge } from '@/components/ui/badge';
 const taskSchema = z.object({
   title: z.string().min(3, "Title must be at least 3 characters"),
   priority: z.enum(['low', 'medium', 'high']),
+  deadline: z.string().optional().nullable(),
   required_skills: z.string().optional(),
   assigned_to: z.string().optional(),
 });
@@ -39,6 +40,7 @@ export default function CreateTaskModal({ isOpen, onClose, onSuccess }: CreateTa
     defaultValues: {
       title: '',
       priority: 'medium',
+      deadline: '',
       required_skills: '',
       assigned_to: '',
     },
@@ -58,7 +60,12 @@ export default function CreateTaskModal({ isOpen, onClose, onSuccess }: CreateTa
         ? data.required_skills.split(',').map(s => s.trim()).filter(Boolean)
         : [];
       
-      const payload: any = { ...data, required_skills: skillsArray };
+      const payload: any = { 
+        ...data, 
+        required_skills: skillsArray,
+        deadline: data.deadline ? new Date(data.deadline).toISOString() : null 
+      };
+      
       if (!payload.assigned_to) delete payload.assigned_to; 
 
       return await api.post('/tasks', payload);
@@ -147,16 +154,28 @@ export default function CreateTaskModal({ isOpen, onClose, onSuccess }: CreateTa
                     </FormItem>
                   )} />
 
-                  <FormField control={form.control} name="required_skills" render={({ field }) => (
+                  <FormField control={form.control} name="deadline" render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Required Skills</FormLabel>
+                      <FormLabel className="flex items-center gap-2">
+                        <Calendar className="w-3 h-3" /> Deadline
+                      </FormLabel>
                       <FormControl>
-                        <Input placeholder="React, Node.js" {...field} />
+                        <Input type="datetime-local" className="block" {...field} value={field.value || ''} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )} />
                 </div>
+
+                <FormField control={form.control} name="required_skills" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Required Skills (Comma separated)</FormLabel>
+                    <FormControl>
+                      <Input placeholder="React, Node.js, Solidity" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
 
                 <div className="pt-4 border-t border-border mt-2">
                   <div className="flex justify-between items-end mb-3">

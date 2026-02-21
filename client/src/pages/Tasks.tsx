@@ -3,12 +3,16 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { 
   Plus, MoreHorizontal, Search, Clock, CheckCircle2, 
-  ChevronLeft, ChevronRight, CircleDashed, AlertCircle, Edit2, Trash2, ShieldCheck 
+  ChevronLeft, ChevronRight, CircleDashed, AlertCircle, 
+  Edit2, Trash2, ShieldCheck 
 } from 'lucide-react';
 import api from '../api/axios';
+import { format, isPast, isWithinInterval, addDays } from 'date-fns';
+
 import CreateTaskModal from '../components/tasks/CreateTaskModal';
 import EditTaskModal from '../components/tasks/EditTaskModal';
 import DeleteConfirmDialog from '../components/shared/DeleteConfirmDialog';
+
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -105,6 +109,32 @@ export default function Tasks() {
     }
   };
 
+  const getDeadlineDisplay = (deadline: string | null, status: string) => {
+    if (!deadline) return <span className="text-muted-foreground text-xs italic">No deadline</span>;
+    const date = new Date(deadline);
+    const isCompleted = status === 'completed';
+
+    if (!isCompleted && isPast(date)) {
+      return (
+        <div className="flex flex-col">
+          <span className="text-xs text-destructive font-bold">{format(date, 'MMM d, p')}</span>
+          <Badge variant="destructive" className="text-[8px] h-4 w-fit px-1 mt-1">OVERDUE</Badge>
+        </div>
+      );
+    }
+
+    if (!isCompleted && isWithinInterval(date, { start: new Date(), end: addDays(new Date(), 2) })) {
+      return (
+        <div className="flex flex-col">
+          <span className="text-xs text-amber-600 font-bold">{format(date, 'MMM d, p')}</span>
+          <Badge variant="outline" className="text-[8px] h-4 w-fit px-1 mt-1 border-amber-500 text-amber-600">DUE SOON</Badge>
+        </div>
+      );
+    }
+
+    return <span className="text-xs text-muted-foreground">{format(date, 'MMM d, yyyy')}</span>;
+  };
+
   const getStatusDisplay = (s: string) => {
     switch(s) {
       case 'assigned': return <div className="flex items-center text-blue-500 font-medium"><CircleDashed className="w-4 h-4 mr-2" /> Assigned</div>;
@@ -125,7 +155,7 @@ export default function Tasks() {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Tasks Directory</h1>
-          <p className="text-muted-foreground text-sm mt-1">Manage and track workforce assignments.</p>
+          <p className="text-muted-foreground text-sm mt-1">Manage workforce assignments and deadlines.</p>
         </div>
         <Button onClick={() => setModals({ ...modals, create: true })}>
           <Plus className="w-4 h-4 mr-2" /> Create Task
@@ -162,7 +192,8 @@ export default function Tasks() {
         <Table>
           <TableHeader className="bg-muted/50">
             <TableRow>
-              <TableHead className="w-[40%]">Task Detail</TableHead>
+              <TableHead className="w-[30%]">Task Detail</TableHead>
+              <TableHead>Deadline</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Priority</TableHead>
               <TableHead>Assignee</TableHead>
@@ -173,8 +204,9 @@ export default function Tasks() {
             {isLoading ? (
               Array.from({ length: 5 }).map((_, i) => (
                 <TableRow key={i}>
-                  <TableCell><Skeleton className="h-5 w-[250px]" /><Skeleton className="h-4 w-[150px] mt-2" /></TableCell>
+                  <TableCell><Skeleton className="h-5 w-[200px]" /><Skeleton className="h-4 w-[120px] mt-2" /></TableCell>
                   <TableCell><Skeleton className="h-5 w-[100px]" /></TableCell>
+                  <TableCell><Skeleton className="h-5 w-[80px]" /></TableCell>
                   <TableCell><Skeleton className="h-5 w-[60px]" /></TableCell>
                   <TableCell><Skeleton className="h-4 w-[120px]" /></TableCell>
                   <TableCell className="text-right"><Skeleton className="h-8 w-8 ml-auto" /></TableCell>
@@ -182,7 +214,7 @@ export default function Tasks() {
               ))
             ) : tasks.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className="h-48 text-center text-muted-foreground">
+                <TableCell colSpan={6} className="h-48 text-center text-muted-foreground">
                   No tasks found matching your criteria.
                 </TableCell>
               </TableRow>
@@ -208,6 +240,7 @@ export default function Tasks() {
                         ))}
                       </div>
                     </TableCell>
+                    <TableCell>{getDeadlineDisplay(task.deadline, task.status)}</TableCell>
                     <TableCell>{getStatusDisplay(task.status)}</TableCell>
                     <TableCell>{getPriorityBadge(task.priority)}</TableCell>
                     <TableCell>

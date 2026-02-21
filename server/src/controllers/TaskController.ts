@@ -8,6 +8,7 @@ const createTaskSchema = z.object({
   title: z.string().min(3, "Title must be at least 3 characters"),
   description: z.string().optional(),
   assigned_to: z.string().uuid("Invalid Employee ID format").optional().nullable(),
+  deadline: z.string().datetime().optional().nullable(),
   priority: z.enum(['low', 'medium', 'high']).default('medium'),
   required_skills: z.array(z.string()).optional()
 });
@@ -19,7 +20,7 @@ const updateStatusSchema = z.object({
 const getTasksQuerySchema = z.object({
   page: z.coerce.number().min(1).default(1),
   limit: z.coerce.number().min(1).max(100).default(10), 
-  sortBy: z.enum(['created_at', 'updated_at', 'title', 'priority', 'status']).default('created_at'),
+  sortBy: z.enum(['created_at', 'updated_at', 'title', 'priority', 'status', 'deadline']).default('created_at'),
   order: z.enum(['asc', 'desc']).default('desc'),
   status: z.string().optional(),
   priority: z.string().optional(),
@@ -31,12 +32,12 @@ const updateTaskSchema = z.object({
   title: z.string().min(3, "Title must be at least 3 characters").optional(),
   description: z.string().optional(),
   assigned_to: z.string().uuid("Invalid Employee ID format").optional().nullable(),
+  deadline: z.string().datetime().optional().nullable(),
   priority: z.enum(['low', 'medium', 'high']).optional(),
   required_skills: z.array(z.string()).optional()
 }).refine(data => Object.keys(data).length > 0, {
   message: "At least one field must be provided to update"
 });
-
 
 export class TaskController {
   
@@ -136,9 +137,7 @@ export class TaskController {
   public async getWeeklyStats(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
       const orgId = req.user!.orgId;
-
-      const stats: IWeeklyTaskStat[] =
-        await TaskService.getWeeklyTaskStats(orgId);
+      const stats: IWeeklyTaskStat[] = await TaskService.getWeeklyTaskStats(orgId);
 
       res.status(200).json({
         success: true,

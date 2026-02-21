@@ -12,7 +12,8 @@ export class TaskService {
       title: taskData.title,
       description: taskData.description,
       priority: taskData.priority,
-      required_skills: JSON.stringify(taskData.required_skills || [])
+      deadline: taskData.deadline, 
+      required_skills: taskData.required_skills || []
     };
 
     return await TaskRepository.create(newTask);
@@ -41,10 +42,6 @@ export class TaskService {
   }
 
   public async updateTask(taskId: string, orgId: string, updates: Partial<ITask>): Promise<ITask> {
-    if (updates.required_skills && Array.isArray(updates.required_skills)) {
-      updates.required_skills = JSON.stringify(updates.required_skills) as any;
-    }
-
     const updatedTask = await TaskRepository.update(taskId, orgId, updates);
     if (!updatedTask) {
       throw new Error('Task not found or you do not have permission to update it.');

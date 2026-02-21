@@ -16,19 +16,27 @@ export class TaskRepository {
   
   public async create(task: ITask): Promise<ITask> {
     const query = `
-      INSERT INTO tasks (org_id, assigned_to, created_by, title, description, priority, required_skills)
+      INSERT INTO tasks (
+        org_id, 
+        title, 
+        description, 
+        priority, 
+        deadline, 
+        required_skills, 
+        assigned_to
+      )
       VALUES ($1, $2, $3, $4, $5, $6, $7)
-      RETURNING *;
+      RETURNING *
     `;
-    
+
     const values = [
       task.org_id,
-      task.assigned_to || null,
-      task.created_by || null,
       task.title,
       task.description || '',
       task.priority || 'medium',
-      task.required_skills || '[]'
+      task.deadline || null,
+      JSON.stringify(task.required_skills || []),
+      task.assigned_to || null
     ];
     
     const result = await db.query(query, values);
@@ -72,7 +80,7 @@ export class TaskRepository {
 
     const whereClause = conditions.join(' AND ');
 
-    const allowedSortColumns = ['created_at', 'updated_at', 'title', 'priority', 'status'];
+    const allowedSortColumns = ['created_at', 'updated_at', 'title', 'priority', 'status', 'deadline'];
     const safeSortBy = allowedSortColumns.includes(sortBy) ? sortBy : 'created_at';
     const safeOrder = order.toLowerCase() === 'asc' ? 'ASC' : 'DESC';
 
@@ -117,12 +125,16 @@ export class TaskRepository {
     const values: any[] = [];
     let paramIndex = 1;
 
-    const updatableFields = ['title', 'description', 'priority', 'assigned_to', 'required_skills'];
+    const updatableFields = ['title', 'description', 'priority', 'assigned_to', 'required_skills', 'deadline'];
 
     for (const [key, value] of Object.entries(updates)) {
       if (updatableFields.includes(key) && value !== undefined) {
         setClauses.push(`${key} = $${paramIndex++}`);
-        values.push(value);
+        if (key === 'required_skills' && Array.isArray(value)) {
+          values.push(JSON.stringify(value));
+        } else {
+          values.push(value);
+        }
       }
     }
 
