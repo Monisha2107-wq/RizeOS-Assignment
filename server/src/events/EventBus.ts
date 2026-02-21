@@ -25,6 +25,11 @@ class EventBus extends EventEmitter {
     console.log(`[EventBus] Emitting event: ${eventName}`);
     this.emit(eventName, payload);
   }
+
+  public subscribe(eventName: EventName, handler: (payload: any) => void): void {
+    console.log(`[EventBus] New subscriber for: ${eventName}`);
+    this.on(eventName, handler);
+  }
 }
 
 export default EventBus.getInstance();

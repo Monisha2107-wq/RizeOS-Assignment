@@ -9,6 +9,7 @@ export interface ITaskQueryParams {
   status?: string;
   priority?: string;
   assigned_to?: string;
+  search?: string;
 }
 
 export class TaskRepository {
@@ -42,7 +43,8 @@ export class TaskRepository {
       order = 'desc',
       status,
       priority,
-      assigned_to
+      assigned_to,
+      search
     } = params;
 
     const offset = (page - 1) * limit;
@@ -62,6 +64,10 @@ export class TaskRepository {
     if (assigned_to) {
       conditions.push(`assigned_to = $${paramIndex++}`);
       values.push(assigned_to);
+    }
+    if (search) {
+      conditions.push(`title ILIKE $${paramIndex++}`);
+      values.push(`%${search}%`);
     }
 
     const whereClause = conditions.join(' AND ');

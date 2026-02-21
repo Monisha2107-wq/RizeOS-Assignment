@@ -1,7 +1,8 @@
 import app from './app';
 import db from './config/db';
 import WebSocketManager from './websocket/WebSocketServer'; 
-import './events/handlers/TaskCompletedHandler'; 
+import EventBus, { EventName } from './events/EventBus';
+import TaskCompletedHandler from './events/handlers/TaskCompletedHandler'; 
 
 const PORT = process.env.PORT || 5000;
 
@@ -9,6 +10,10 @@ const startServer = async () => {
   try {
     const res = await db.query('SELECT NOW()');
     console.log(`Database connected. Server time: ${res.rows[0].now}`);
+
+    EventBus.subscribe(EventName.TASK_COMPLETED, (data) => {
+      TaskCompletedHandler.handle(data);
+    });
 
     const server = app.listen(PORT, () => {
       console.log(`RizeOS Server running in ${process.env.NODE_ENV || 'development'} mode on port ${PORT}`);

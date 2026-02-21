@@ -23,7 +23,8 @@ const getTasksQuerySchema = z.object({
   order: z.enum(['asc', 'desc']).default('desc'),
   status: z.string().optional(),
   priority: z.string().optional(),
-  assigned_to: z.string().uuid().optional()
+  assigned_to: z.string().uuid().optional(),
+  search: z.string().optional()
 });
 
 const updateTaskSchema = z.object({

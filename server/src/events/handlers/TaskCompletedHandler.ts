@@ -3,18 +3,14 @@ import ScoringEngine from '../../services/ai/ScoringEngine';
 import Web3Logger from '../../services/web3/Web3Logger';
 
 export class TaskCompletedHandler {
-  
-  constructor() {
-    EventBus.on(EventName.TASK_COMPLETED, this.handle.bind(this));
-  }
+  constructor() {}
 
-  private async handle(payload: { taskId: string; orgId: string; employeeId: string }) {
+  public async handle(payload: { taskId: string; orgId: string; employeeId: string }) {
     console.log(`[EventHandler] Reacting to TASK_COMPLETED for Task ID: ${payload.taskId}`);
     
     try {
-
       await ScoringEngine.recomputeScore(payload.employeeId, payload.orgId);
-      
+    
       Web3Logger.logTaskCompletion(payload.taskId, payload.employeeId, payload.orgId)
         .catch(err => console.error("Web3 Background Error:", err));
       

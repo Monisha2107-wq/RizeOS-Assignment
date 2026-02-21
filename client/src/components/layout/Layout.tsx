@@ -1,119 +1,121 @@
+import React, { useState } from 'react';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
-import { useAuthStore } from '@/store/authStore';
-import { ThemeToggle } from '../ThemeToggle';
 import { 
-  LayoutDashboard, 
-  Users, 
-  CheckSquare, 
-  BrainCircuit, 
-  LogOut, 
-  Menu 
+  LayoutDashboard, Users, CheckSquare, BrainCircuit, 
+  LogOut, Menu, X, Wallet, ShieldCheck 
 } from 'lucide-react';
+import { useAuthStore } from '../../store/authStore';
 import { Button } from '@/components/ui/button';
-import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
-import { cn } from '@/lib/utils'; 
-
-const navigation = [
-  { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-  { name: 'Tasks', href: '/tasks', icon: CheckSquare },
-  { name: 'Employees', href: '/employees', icon: Users },
-  { name: 'AI Insights', href: '/ai-insights', icon: BrainCircuit },
-];
+import { ThemeToggle } from '../ThemeToggle';
+import { toast } from 'sonner';
 
 export default function Layout() {
+  const { logout, organization } = useAuthStore();
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [walletAddress, setWalletAddress] = useState<string | null>(null);
+  const [isConnecting, setIsConnecting] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
-  const logout = useAuthStore((state) => state.logout);
-  const user = useAuthStore((state) => state.user);
 
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
+  const connectWallet = async () => {
+    if (!window.ethereum) {
+      toast.error("Please install MetaMask to use Web3 features.");
+      return;
+    }
+    
+    setIsConnecting(true);
+    try {
+      const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+      setWalletAddress(accounts[0]);
+      toast.success("Wallet connected to RizeOS");
+    } catch (err) {
+      toast.error("Connection failed.");
+    } finally {
+      setIsConnecting(false);
+    }
   };
 
-  const NavLinks = () => (
-    <div className="flex flex-col gap-2 mt-6">
-      {navigation.map((item) => {
-        const isActive = location.pathname.includes(item.href);
-        return (
-          <Link
-            key={item.name}
-            to={item.href}
-            className={cn(
-              "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
-              isActive 
-                ? "bg-primary text-primary-foreground" 
-                : "text-muted-foreground hover:bg-muted hover:text-foreground"
-            )}
-          >
-            <item.icon className="h-4 w-4" />
-            {item.name}
-          </Link>
-        );
-      })}
-    </div>
-  );
+  const menuItems = [
+    { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
+    { name: 'Employees', path: '/employees', icon: Users },
+    { name: 'Tasks', path: '/tasks', icon: CheckSquare },
+    { name: 'AI Insights', path: '/ai-insights', icon: BrainCircuit },
+  ];
 
   return (
-    <div className="flex h-screen w-full bg-background overflow-hidden">
-      <aside className="hidden w-64 flex-col border-r bg-card md:flex h-full">
-        <div className="flex h-14 items-center border-b px-4 lg:h-[60px] lg:px-6">
-          <div className="flex items-center gap-2 font-semibold tracking-tight">
-            <div className="h-6 w-6 rounded bg-primary text-primary-foreground flex items-center justify-center text-xs">R</div>
-            RizeOS
+    <div className="flex h-screen bg-background text-foreground overflow-hidden">
+      {/* SIDEBAR (Desktop) */}
+      <aside className="hidden md:flex flex-col w-64 border-r bg-card">
+        <div className="p-6 flex items-center gap-2">
+          <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
+            <ShieldCheck className="text-primary-foreground w-5 h-5" />
           </div>
+          <span className="font-bold text-xl tracking-tight">RizeOS</span>
         </div>
-        <div className="flex-1 px-4 overflow-y-auto">
-          <NavLinks />
-        </div>
-        <div className="p-4 border-t shrink-0">
-          <div className="flex items-center gap-3 px-2 py-2 mb-2">
-            <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center text-sm font-medium">
-              {user?.role?.charAt(0) || 'U'}
-            </div>
-            <div className="flex flex-col text-sm">
-              <span className="font-medium truncate max-w-[120px]">{user?.role}</span>
-              <span className="text-xs text-muted-foreground capitalize">{user?.role}</span>
-            </div>
-          </div>
-          <Button variant="ghost" className="w-full justify-start text-muted-foreground" onClick={handleLogout}>
-            <LogOut className="mr-2 h-4 w-4" />
-            Logout
+        
+        <nav className="flex-1 px-4 space-y-1">
+          {menuItems.map((item) => {
+            const Icon = item.icon;
+            const isActive = location.pathname === item.path;
+            return (
+              <Link
+                key={item.path}
+                to={item.path}
+                className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
+                  isActive 
+                    ? 'bg-primary/10 text-primary' 
+                    : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                }`}
+              >
+                <Icon className="w-4 h-4" />
+                {item.name}
+              </Link>
+            );
+          })}
+        </nav>
+
+        <div className="p-4 border-t">
+          <Button 
+            variant="ghost" 
+            className="w-full justify-start text-muted-foreground hover:text-destructive" 
+            onClick={() => { logout(); navigate('/login'); }}
+          >
+            <LogOut className="w-4 h-4 mr-2" /> Logout
           </Button>
         </div>
       </aside>
 
-      <div className="flex flex-1 flex-col min-w-0">
-        
-        <header className="flex h-14 shrink-0 items-center gap-4 border-b bg-background px-4 lg:h-[60px] lg:px-6 justify-between md:justify-end">
-          
-          <Sheet>
-            <SheetTrigger asChild>
-              <Button variant="outline" size="icon" className="shrink-0 md:hidden">
-                <Menu className="h-5 w-5" />
-                <span className="sr-only">Toggle navigation menu</span>
-              </Button>
-            </SheetTrigger>
-            <SheetContent side="left" className="flex flex-col">
-              <div className="flex items-center gap-2 font-semibold tracking-tight pb-4 border-b">
-                 RizeOS
-              </div>
-              <NavLinks />
-              <div className="mt-auto">
-                <Button variant="ghost" className="w-full justify-start" onClick={handleLogout}>
-                  <LogOut className="mr-2 h-4 w-4" />
-                  Logout
-                </Button>
-              </div>
-            </SheetContent>
-          </Sheet>
-
+      {/* MAIN CONTENT */}
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        <header className="h-16 border-b bg-card/50 backdrop-blur-sm flex items-center justify-between px-6 shrink-0">
           <div className="flex items-center gap-4">
+            <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setIsMobileMenuOpen(true)}>
+              <Menu className="w-5 h-5" />
+            </Button>
+            <h2 className="text-sm font-semibold truncate hidden sm:block">
+              {organization?.name || 'Workspace'} Admin
+            </h2>
+          </div>
+
+          <div className="flex items-center gap-3">
+            {/* 🚀 WALLET BUTTON */}
+            <Button 
+              variant={walletAddress ? "outline" : "default"}
+              size="sm"
+              className="h-9 gap-2"
+              onClick={connectWallet}
+              disabled={isConnecting}
+            >
+              <Wallet className="w-4 h-4" />
+              {walletAddress 
+                ? `${walletAddress.substring(0,6)}...${walletAddress.substring(38)}` 
+                : "Connect Wallet"}
+            </Button>
             <ThemeToggle />
           </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto p-4 md:p-8">
+        <main className="flex-1 overflow-y-auto p-6 bg-muted/30">
           <Outlet />
         </main>
       </div>

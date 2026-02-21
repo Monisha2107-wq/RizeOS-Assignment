@@ -37,11 +37,17 @@ export class AIController {
     try {
       const orgId = req.user!.orgId;
       const query = `
-        SELECT e.name, e.role, a.productivity_score, a.task_completion_rate, a.trend, a.computed_at 
+        SELECT 
+          e.name, 
+          e.role, 
+          COALESCE(a.productivity_score, 0) as productivity_score, 
+          COALESCE(a.task_completion_rate, 0) as task_completion_rate, 
+          COALESCE(a.trend, 'neutral') as trend, 
+          a.computed_at 
         FROM employees e 
-        JOIN ai_scores a ON e.id = a.employee_id 
+        LEFT JOIN ai_scores a ON e.id = a.employee_id 
         WHERE e.org_id = $1
-        ORDER BY a.productivity_score DESC
+        ORDER BY productivity_score DESC;
       `;
       
       const { default: db } = await import('../config/db'); 
