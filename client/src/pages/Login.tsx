@@ -1,16 +1,15 @@
-import React, { useState } from 'react'; //
+import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { z } from 'zod';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation } from '@tanstack/react-query';
-import { Loader2, Eye, EyeOff } from 'lucide-react'; //
+import { Loader2, Eye, EyeOff } from 'lucide-react'; 
 import { toast } from 'sonner';
 
 import api from '../api/axios';
 import { useAuthStore } from '../store/authStore';
 
-// Shadcn UI
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
@@ -26,7 +25,7 @@ type LoginFormValues = z.infer<typeof loginSchema>;
 export default function Login() {
   const navigate = useNavigate();
   const setAuth = useAuthStore((state) => state.setAuth);
-  const [showPassword, setShowPassword] = useState(false); //
+  const [showPassword, setShowPassword] = useState(false); 
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
@@ -76,9 +75,9 @@ export default function Login() {
                   <div className="relative"> {/* */}
                     <FormControl>
                       <Input 
-                        type={showPassword ? "text" : "password"} //
+                        type={showPassword ? "text" : "password"}
                         placeholder="••••••••" 
-                        className="pr-10" // Make room for the icon
+                        className="pr-10" 
                         {...field} 
                       />
                     </FormControl>
@@ -87,12 +86,12 @@ export default function Login() {
                       variant="ghost"
                       size="sm"
                       className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent text-muted-foreground"
-                      onClick={() => setShowPassword((prev) => !prev)} //
+                      onClick={() => setShowPassword((prev) => !prev)}
                     >
                       {showPassword ? (
-                        <EyeOff className="h-4 w-4" /> //
+                        <EyeOff className="h-4 w-4" /> 
                       ) : (
-                        <Eye className="h-4 w-4" /> //
+                        <Eye className="h-4 w-4" /> 
                       )}
                     </Button>
                   </div>

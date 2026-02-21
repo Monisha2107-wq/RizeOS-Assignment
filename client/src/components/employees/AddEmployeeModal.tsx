@@ -7,14 +7,12 @@ import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import api from '../../api/axios';
 
-// Shadcn Components
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
-// 1. ZOD SCHEMA for Validation
 const employeeSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),
   email: z.string().email("Invalid email address"),
@@ -55,7 +53,6 @@ export default function AddEmployeeModal({ isOpen, onClose }: AddEmployeeModalPr
 
   const createEmployeeMutation = useMutation({
     mutationFn: async (data: EmployeeFormValues) => {
-      // Parse comma-separated skills into an array
       const skillsArray = data.skills
         ? data.skills.split(',').map(s => s.trim()).filter(Boolean)
         : [];

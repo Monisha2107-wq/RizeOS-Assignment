@@ -1,9 +1,8 @@
-import { Response } from 'express';
+import { NextFunction, Response } from 'express';
 import { AuthRequest } from '../middleware/auth.middleware';
 import TaskService from '../services/TaskService';
 import { z } from 'zod';
-
-// --- ZOD SCHEMAS ---
+import { IWeeklyTaskStat } from '../interfaces/task.interface';
 
 const createTaskSchema = z.object({
   title: z.string().min(3, "Title must be at least 3 characters"),
@@ -17,10 +16,9 @@ const updateStatusSchema = z.object({
   status: z.enum(['assigned', 'in_progress', 'completed'])
 });
 
-// 🚀 NEW: Validation for Query Parameters
 const getTasksQuerySchema = z.object({
   page: z.coerce.number().min(1).default(1),
-  limit: z.coerce.number().min(1).max(100).default(10), // Max 100 per page to prevent abuse
+  limit: z.coerce.number().min(1).max(100).default(10), 
   sortBy: z.enum(['created_at', 'updated_at', 'title', 'priority', 'status']).default('created_at'),
   order: z.enum(['asc', 'desc']).default('desc'),
   status: z.string().optional(),
@@ -28,7 +26,6 @@ const getTasksQuerySchema = z.object({
   assigned_to: z.string().uuid().optional()
 });
 
-// 🚀 NEW: Validation for Full Edits (All fields optional)
 const updateTaskSchema = z.object({
   title: z.string().min(3, "Title must be at least 3 characters").optional(),
   description: z.string().optional(),
@@ -39,8 +36,6 @@ const updateTaskSchema = z.object({
   message: "At least one field must be provided to update"
 });
 
-
-// --- CONTROLLER ---
 
 export class TaskController {
   
@@ -62,7 +57,6 @@ export class TaskController {
     }
   }
 
-  // 🚀 UPGRADED: Handles Pagination, Filtering, and Sorting metadata
   public async getTasks(req: AuthRequest, res: Response): Promise<void> {
     try {
       const orgId = req.user!.orgId;
@@ -107,7 +101,6 @@ export class TaskController {
     }
   }
 
-  // 🚀 NEW: Update endpoint
   public async updateTask(req: AuthRequest, res: Response): Promise<void> {
     try {
       const orgId = req.user!.orgId;
@@ -126,7 +119,6 @@ export class TaskController {
     }
   }
 
-  // 🚀 NEW: Delete endpoint
   public async deleteTask(req: AuthRequest, res: Response): Promise<void> {
     try {
       const orgId = req.user!.orgId;
@@ -137,6 +129,22 @@ export class TaskController {
       res.status(200).json({ success: true, message: 'Task deleted successfully' });
     } catch (error: any) {
       res.status(404).json({ success: false, message: error.message });
+    }
+  }
+
+  public async getWeeklyStats(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const orgId = req.user!.orgId;
+
+      const stats: IWeeklyTaskStat[] =
+        await TaskService.getWeeklyTaskStats(orgId);
+
+      res.status(200).json({
+        success: true,
+        data: stats
+      });
+    } catch (error) {
+      next(error);
     }
   }
 }

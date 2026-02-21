@@ -1,7 +1,6 @@
 import db from '../config/db';
 import { ITask } from '../interfaces/task.interface';
 
-// We define an interface for our new query parameters
 export interface ITaskQueryParams {
   page?: number;
   limit?: number;
@@ -28,14 +27,13 @@ export class TaskRepository {
       task.title,
       task.description || '',
       task.priority || 'medium',
-      task.required_skills || '[]' // Ensure this is stringified JSON if stored as JSONB
+      task.required_skills || '[]'
     ];
     
     const result = await db.query(query, values);
     return result.rows[0] as ITask;
   }
 
-  // 🚀 UPGRADED: Now supports Pagination, Filtering, and Sorting
   public async findAllByOrg(orgId: string, params: ITaskQueryParams = {}): Promise<{ data: ITask[], total: number }> {
     const { 
       page = 1, 
@@ -49,7 +47,6 @@ export class TaskRepository {
 
     const offset = (page - 1) * limit;
     
-    // 1. Build the dynamic WHERE clause
     const conditions = ['org_id = $1'];
     const values: any[] = [orgId];
     let paramIndex = 2;
@@ -69,12 +66,10 @@ export class TaskRepository {
 
     const whereClause = conditions.join(' AND ');
 
-    // 2. Whitelist sort columns to prevent SQL Injection
     const allowedSortColumns = ['created_at', 'updated_at', 'title', 'priority', 'status'];
     const safeSortBy = allowedSortColumns.includes(sortBy) ? sortBy : 'created_at';
     const safeOrder = order.toLowerCase() === 'asc' ? 'ASC' : 'DESC';
 
-    // 3. Execute the data query
     const dataQuery = `
       SELECT * FROM tasks 
       WHERE ${whereClause} 
@@ -82,7 +77,6 @@ export class TaskRepository {
       LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
     `;
     
-    // 4. Execute a count query for frontend pagination numbers
     const countQuery = `SELECT COUNT(*) FROM tasks WHERE ${whereClause}`;
 
     const [dataResult, countResult] = await Promise.all([
@@ -112,9 +106,7 @@ export class TaskRepository {
     return result.rows.length ? (result.rows[0] as ITask) : null;
   }
 
-  // 🚀 NEW: Full Edit Capability
   public async update(taskId: string, orgId: string, updates: Partial<ITask>): Promise<ITask | null> {
-    // Dynamically build the UPDATE set clause based on provided fields
     const setClauses: string[] = [];
     const values: any[] = [];
     let paramIndex = 1;
@@ -128,7 +120,7 @@ export class TaskRepository {
       }
     }
 
-    if (setClauses.length === 0) return null; // Nothing to update
+    if (setClauses.length === 0) return null; 
 
     setClauses.push(`updated_at = CURRENT_TIMESTAMP`);
 
@@ -145,7 +137,6 @@ export class TaskRepository {
     return result.rows.length ? (result.rows[0] as ITask) : null;
   }
 
-  // 🚀 NEW: Delete Capability
   public async delete(taskId: string, orgId: string): Promise<boolean> {
     const query = `
       DELETE FROM tasks 
@@ -156,7 +147,6 @@ export class TaskRepository {
     return (result.rowCount ?? 0) > 0;
   }
 
-  // Also upgrading this to support pagination
   public async findAllByEmployee(employeeId: string, page = 1, limit = 10): Promise<{ data: ITask[], total: number }> {
     const offset = (page - 1) * limit;
     
@@ -177,6 +167,24 @@ export class TaskRepository {
       data: dataResult.rows as ITask[],
       total: parseInt(countResult.rows[0].count, 10)
     };
+  }
+
+  public async getWeeklyStats(orgId: string): Promise<{ date: string; count: number }[]> {
+    const query = `
+      SELECT 
+        TO_CHAR(updated_at, 'YYYY-MM-DD') as date, 
+        COUNT(*)::int as count
+      FROM tasks
+      WHERE 
+        org_id = $1 AND 
+        status = 'completed' AND 
+        updated_at >= CURRENT_DATE - INTERVAL '6 days'
+      GROUP BY date
+      ORDER BY date ASC;
+    `;
+
+    const result = await db.query(query, [orgId]);
+    return result.rows;
   }
 }
 

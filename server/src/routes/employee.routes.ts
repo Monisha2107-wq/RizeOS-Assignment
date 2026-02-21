@@ -4,13 +4,10 @@ import AuthMiddleware from '../middleware/auth.middleware';
 
 const router = Router();
 
-// Apply base authentication to all routes
 router.use(AuthMiddleware.verifyToken);
 
-// Any authenticated user in the org can VIEW employees
 router.get('/', EmployeeController.getEmployees.bind(EmployeeController));
 
-// 🔒 ONLY Admins can modify employees
 router.post(
   '/', 
   AuthMiddleware.requireAdmin, 

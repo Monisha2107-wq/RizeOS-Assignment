@@ -7,7 +7,6 @@ import { Sparkles, UserCheck, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import api from '../../api/axios';
 
-// Shadcn UI Components
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -16,7 +15,6 @@ import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 
-// 1. ZOD SCHEMA
 const taskSchema = z.object({
   title: z.string().min(3, "Title must be at least 3 characters"),
   priority: z.enum(['low', 'medium', 'high']),
@@ -36,7 +34,6 @@ export default function CreateTaskModal({ isOpen, onClose, onSuccess }: CreateTa
   const queryClient = useQueryClient();
   const [aiRecommendations, setAiRecommendations] = useState<any[]>([]);
 
-  // 2. FORM SETUP
   const form = useForm<TaskFormValues>({
     resolver: zodResolver(taskSchema),
     defaultValues: {
@@ -55,7 +52,6 @@ export default function CreateTaskModal({ isOpen, onClose, onSuccess }: CreateTa
     }
   };
 
-  // 3. MUTATIONS
   const createTaskMutation = useMutation({
     mutationFn: async (data: TaskFormValues) => {
       const skillsArray = data.required_skills
@@ -110,7 +106,6 @@ export default function CreateTaskModal({ isOpen, onClose, onSuccess }: CreateTa
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-[600px] p-0 overflow-hidden bg-background">
         
-        {/* FIXED HEADER */}
         <DialogHeader className="px-6 pt-6 pb-4 border-b">
           <DialogTitle className="text-xl">Create Task</DialogTitle>
           <DialogDescription>Assign a new task to your workforce or let AI find the perfect match.</DialogDescription>
@@ -119,7 +114,6 @@ export default function CreateTaskModal({ isOpen, onClose, onSuccess }: CreateTa
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col">
             
-            {/* 🚀 FIXED: Explicit max-height on ScrollArea ensures the scrollbar actually appears! */}
             <ScrollArea className="max-h-[60vh] w-full">
               <div className="px-6 py-4 space-y-5">
                 
@@ -193,7 +187,6 @@ export default function CreateTaskModal({ isOpen, onClose, onSuccess }: CreateTa
                     </FormItem>
                   )} />
 
-                  {/* AI Recommendations List */}
                   {aiRecommendations.length > 0 && (
                     <div className="space-y-2 mt-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
                       <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-2">Top AI Matches</p>
@@ -231,7 +224,6 @@ export default function CreateTaskModal({ isOpen, onClose, onSuccess }: CreateTa
               </div>
             </ScrollArea>
 
-            {/* FIXED FOOTER */}
             <DialogFooter className="px-6 py-4 border-t bg-muted/40">
               <Button type="button" variant="ghost" onClick={() => handleOpenChange(false)}>
                 Cancel

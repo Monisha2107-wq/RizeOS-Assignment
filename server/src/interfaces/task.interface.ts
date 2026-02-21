@@ -13,3 +13,8 @@ export interface ITask {
   created_at?: Date;
   updated_at?: Date;
 }
+
+export interface IWeeklyTaskStat {
+  name: string;
+  tasks: number;
+}

@@ -3,9 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '../store/authStore';
 import api from '../api/axios';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
-import { Users, CheckSquare, Activity, Sparkles } from 'lucide-react';
-
-// Shadcn UI
+import { Users, CheckSquare, Activity, Sparkles, Clock, UserCheck } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -13,11 +11,9 @@ export default function Dashboard() {
   const { token, organization } = useAuthStore();
   const queryClient = useQueryClient();
   const wsRef = useRef<WebSocket | null>(null);
-  
   const [liveEvent, setLiveEvent] = useState<string | null>(null);
 
-  // Use TanStack Query to fetch and cache dashboard data simultaneously
-  const { data: dashboardData, isLoading } = useQuery({
+  const { data: dashboardData, isLoading: isStatsLoading } = useQuery({
     queryKey: ['dashboardData'],
     queryFn: async () => {
       const [empRes, taskRes] = await Promise.all([
@@ -28,25 +24,25 @@ export default function Dashboard() {
       const employees = empRes.data.data || [];
       const tasks = taskRes.data.data || [];
 
-      // Compute stats
-      const totalEmployees = employees.length;
-      const activeTasks = tasks.filter((t: any) => t.status === 'in_progress' || t.status === 'assigned').length;
-      const completedTasks = tasks.filter((t: any) => t.status === 'completed').length;
-
-      // Generate chart data based on completed tasks
-      const chartData = [
-        { name: 'Mon', tasks: Math.floor(Math.random() * 5) + 1 },
-        { name: 'Tue', tasks: Math.floor(Math.random() * 8) + 2 },
-        { name: 'Wed', tasks: Math.floor(Math.random() * 10) + 3 },
-        { name: 'Thu', tasks: completedTasks }, 
-        { name: 'Fri', tasks: 0 },
-      ];
-
-      return { totalEmployees, activeTasks, completedTasks, chartData };
+      return {
+        totalEmployees: employees.length,
+        activeEmployees: employees.filter((e: any) => e.status === 'active' || !e.status).length,
+        assignedTasks: tasks.filter((t: any) => t.status === 'assigned').length,
+        inProgressTasks: tasks.filter((t: any) => t.status === 'in_progress').length,
+        completedTasks: tasks.filter((t: any) => t.status === 'completed').length,
+        totalTasks: tasks.length
+      };
     }
   });
 
-  // WebSocket for Live Updates
+  const { data: chartData = [], isLoading: isChartLoading } = useQuery({
+    queryKey: ['weeklyStats'],
+    queryFn: async () => {
+      const res = await api.get('/tasks/stats/weekly');
+      return res.data.data;
+    }
+  });
+
   useEffect(() => {
     if (!token) return;
 
@@ -60,8 +56,8 @@ export default function Dashboard() {
         setLiveEvent(`Task completed by ID: ${parsed.data.employeeId.substring(0,8)}...`);
         setTimeout(() => setLiveEvent(null), 4000);
 
-        // Tell React Query to refetch the dashboard data and task board in the background!
         queryClient.invalidateQueries({ queryKey: ['dashboardData'] });
+        queryClient.invalidateQueries({ queryKey: ['weeklyStats'] });
         queryClient.invalidateQueries({ queryKey: ['tasks'] });
       }
     };
@@ -71,16 +67,16 @@ export default function Dashboard() {
     };
   }, [token, queryClient]);
 
-  if (isLoading || !dashboardData) {
+  if (isStatsLoading || !dashboardData) {
     return <DashboardSkeleton />;
   }
 
-  const { totalEmployees, activeTasks, completedTasks, chartData } = dashboardData;
+  const { totalEmployees, activeEmployees, assignedTasks, inProgressTasks, completedTasks, totalTasks } = dashboardData;
+  const completionRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+  const circumference = 2 * Math.PI * 70;
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
-      
-      {/* HEADER */}
       <div className="flex justify-between items-end mb-8">
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-foreground">Overview</h1>
@@ -95,43 +91,59 @@ export default function Dashboard() {
         )}
       </div>
 
-      {/* STATS ROW */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card className="relative overflow-hidden border-border shadow-sm">
-          <div className="absolute top-0 right-0 p-4 opacity-5 dark:opacity-10"><Users className="w-16 h-16 text-primary" /></div>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Total Employees</CardTitle>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+        <Card className="border-border shadow-sm">
+          <CardHeader className="pb-2 px-4 flex flex-row items-center justify-between space-y-0">
+            <CardTitle className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Total Staff</CardTitle>
+            <Users className="w-3.5 h-3.5 text-muted-foreground" />
           </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-bold text-foreground">{totalEmployees}</p>
+          <CardContent className="px-4 pb-4">
+            <p className="text-2xl font-bold">{totalEmployees}</p>
           </CardContent>
         </Card>
-        
-        <Card className="relative overflow-hidden border-border shadow-sm">
-          <div className="absolute top-0 right-0 p-4 opacity-5 dark:opacity-10"><Activity className="w-16 h-16 text-primary" /></div>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Active Tasks</CardTitle>
+
+        <Card className="border-border shadow-sm">
+          <CardHeader className="pb-2 px-4 flex flex-row items-center justify-between space-y-0">
+            <CardTitle className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Active Staff</CardTitle>
+            <UserCheck className="w-3.5 h-3.5 text-emerald-500" />
           </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-bold text-amber-500 dark:text-amber-400">{activeTasks}</p>
+          <CardContent className="px-4 pb-4">
+            <p className="text-2xl font-bold text-emerald-600">{activeEmployees}</p>
           </CardContent>
         </Card>
-        
-        <Card className="relative overflow-hidden border-border shadow-sm">
-          <div className="absolute top-0 right-0 p-4 opacity-5 dark:opacity-10"><CheckSquare className="w-16 h-16 text-primary" /></div>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Completed Tasks</CardTitle>
+
+        <Card className="border-border shadow-sm">
+          <CardHeader className="pb-2 px-4 flex flex-row items-center justify-between space-y-0">
+            <CardTitle className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Assigned</CardTitle>
+            <Clock className="w-3.5 h-3.5 text-blue-500" />
           </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-bold text-emerald-600 dark:text-emerald-400">{completedTasks}</p>
+          <CardContent className="px-4 pb-4">
+            <p className="text-2xl font-bold text-blue-500">{assignedTasks}</p>
+          </CardContent>
+        </Card>
+
+        <Card className="border-border shadow-sm">
+          <CardHeader className="pb-2 px-4 flex flex-row items-center justify-between space-y-0">
+            <CardTitle className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">In Progress</CardTitle>
+            <Activity className="w-3.5 h-3.5 text-amber-500" />
+          </CardHeader>
+          <CardContent className="px-4 pb-4">
+            <p className="text-2xl font-bold text-amber-500">{inProgressTasks}</p>
+          </CardContent>
+        </Card>
+
+        <Card className="border-border shadow-sm">
+          <CardHeader className="pb-2 px-4 flex flex-row items-center justify-between space-y-0">
+            <CardTitle className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Completed</CardTitle>
+            <CheckSquare className="w-3.5 h-3.5 text-emerald-600" />
+          </CardHeader>
+          <CardContent className="px-4 pb-4">
+            <p className="text-2xl font-bold text-emerald-600">{completedTasks}</p>
           </CardContent>
         </Card>
       </div>
       
-      {/* CHART ROW - 2 Column Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        
-        {/* CHART 1: Bar Chart */}
         <Card className="shadow-sm border-border">
           <CardHeader className="flex flex-row items-center space-y-0 pb-6">
             <Sparkles className="w-5 h-5 text-primary mr-2" />
@@ -139,71 +151,89 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent>
             <div className="h-[250px] w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                {/* 🚀 FIXED: Removed hsl() wrappers from all var() calls */}
-                <BarChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
-                  <XAxis dataKey="name" stroke="var(--muted-foreground)" tick={{fontSize: 12, fill: 'var(--muted-foreground)'}} axisLine={false} tickLine={false} />
-                  <YAxis stroke="var(--muted-foreground)" tick={{fontSize: 12, fill: 'var(--muted-foreground)'}} axisLine={false} tickLine={false} />
-                  <Tooltip 
-                    cursor={{fill: 'var(--muted)', opacity: 0.5}}
-                    contentStyle={{ backgroundColor: 'var(--card)', borderColor: 'var(--border)', color: 'var(--foreground)', borderRadius: '8px' }}
-                  />
-                  <Bar dataKey="tasks" fill="var(--primary)" radius={[4, 4, 0, 0]} maxBarSize={40} />
-                </BarChart>
-              </ResponsiveContainer>
+              {isChartLoading ? (
+                <Skeleton className="h-full w-full" />
+              ) : (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+                    <XAxis dataKey="name" stroke="var(--muted-foreground)" tick={{fontSize: 12, fill: 'var(--muted-foreground)'}} axisLine={false} tickLine={false} />
+                    <YAxis stroke="var(--muted-foreground)" tick={{fontSize: 12, fill: 'var(--muted-foreground)'}} axisLine={false} tickLine={false} />
+                    <Tooltip 
+                      cursor={{fill: 'var(--muted)', opacity: 0.5}}
+                      contentStyle={{ backgroundColor: 'var(--card)', borderColor: 'var(--border)', color: 'var(--foreground)', borderRadius: '8px' }}
+                    />
+                    <Bar dataKey="tasks" fill="var(--primary)" radius={[4, 4, 0, 0]} maxBarSize={40} />
+                  </BarChart>
+                </ResponsiveContainer>
+              )}
             </div>
           </CardContent>
         </Card>
 
-        {/* CHART 2: Task Distribution Ring */}
         <Card className="shadow-sm border-border flex flex-col">
           <CardHeader className="flex flex-row items-center space-y-0 pb-6">
             <Activity className="w-5 h-5 text-muted-foreground mr-2" />
             <CardTitle className="text-base font-bold">Task Distribution</CardTitle>
           </CardHeader>
-          <CardContent className="flex-1 flex flex-col items-center justify-center pb-8">
-             <div className="w-32 h-32 rounded-full border-8 border-muted flex items-center justify-center relative">
-               <div className="absolute inset-0 border-8 border-primary rounded-full" style={{ clipPath: 'polygon(50% 50%, 100% 0, 100% 100%, 0 100%)' }}></div>
-               <span className="text-xl font-bold text-foreground z-10">
-                 {totalEmployees > 0 ? Math.round((completedTasks / (activeTasks + completedTasks || 1)) * 100) : 0}%
-               </span>
-             </div>
-             <p className="text-sm text-muted-foreground mt-6 text-center">
-               Overall Completion Rate
-             </p>
+          <CardContent className="flex-1 flex flex-col items-center justify-center">
+            <div className="relative w-40 h-40 flex items-center justify-center">
+              <svg className="w-full h-full transform -rotate-90" viewBox="0 0 160 160">
+                <circle cx="80" cy="80" r="70" stroke="currentColor" strokeWidth="12" fill="transparent" className="text-muted/30" />
+                <circle
+                  cx="80"
+                  cy="80"
+                  r="70"
+                  stroke="currentColor"
+                  strokeWidth="12"
+                  fill="transparent"
+                  strokeDasharray={circumference}
+                  strokeDashoffset={circumference - (circumference * (completionRate / 100))}
+                  strokeLinecap="round"
+                  className="text-primary transition-all duration-1000 ease-out"
+                />
+              </svg>
+              <div className="absolute flex flex-col items-center justify-center">
+                <span className="text-3xl font-bold text-foreground">{completionRate}%</span>
+                <span className="text-[10px] uppercase text-muted-foreground font-medium">Done</span>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-4 w-full mt-8 pt-4 border-t border-border">
+              <div className="text-center">
+                <p className="text-[10px] uppercase text-muted-foreground font-semibold">Assigned</p>
+                <p className="text-lg font-bold text-blue-500">{assignedTasks}</p>
+              </div>
+              <div className="text-center border-x border-border">
+                <p className="text-[10px] uppercase text-muted-foreground font-semibold">Doing</p>
+                <p className="text-lg font-bold text-amber-500">{inProgressTasks}</p>
+              </div>
+              <div className="text-center">
+                <p className="text-[10px] uppercase text-muted-foreground font-semibold">Done</p>
+                <p className="text-lg font-bold text-emerald-500">{completedTasks}</p>
+              </div>
+            </div>
           </CardContent>
         </Card>
-
       </div>
     </div>
   );
 }
 
-// SHIMMER LOADER
 const DashboardSkeleton = () => (
   <div className="space-y-6 max-w-7xl mx-auto">
     <div className="mb-8">
       <Skeleton className="h-9 w-48 mb-2" />
       <Skeleton className="h-5 w-64" />
     </div>
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-      {[1, 2, 3].map(i => (
-        <Card key={i}>
-          <CardHeader className="pb-2"><Skeleton className="h-4 w-24" /></CardHeader>
-          <CardContent><Skeleton className="h-9 w-16" /></CardContent>
-        </Card>
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+      {[1, 2, 3, 4, 5].map(i => (
+        <Card key={i}><CardHeader className="pb-2"><Skeleton className="h-4 w-16" /></CardHeader><CardContent><Skeleton className="h-8 w-10" /></CardContent></Card>
       ))}
     </div>
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      <Card>
-        <CardHeader><Skeleton className="h-6 w-48" /></CardHeader>
-        <CardContent><Skeleton className="h-[250px] w-full" /></CardContent>
-      </Card>
-      <Card>
-        <CardHeader><Skeleton className="h-6 w-48" /></CardHeader>
-        <CardContent><Skeleton className="h-[250px] w-full" /></CardContent>
-      </Card>
+      <Card><CardHeader><Skeleton className="h-6 w-48" /></CardHeader><CardContent><Skeleton className="h-[250px] w-full" /></CardContent></Card>
+      <Card><CardHeader><Skeleton className="h-6 w-48" /></CardHeader><CardContent><Skeleton className="h-[250px] w-full" /></CardContent></Card>
     </div>
   </div>
 );

@@ -39,7 +39,6 @@ export class EmployeeRepository {
     return result.rows.length ? (result.rows[0] as IEmployee) : null;
   }
 
-  // 🚀 UPGRADED: Pagination & Filtering added
   public async findAllByOrg(orgId: string, params: IEmployeeQueryParams = {}): Promise<{ data: IEmployee[], total: number }> {
     const { 
       page = 1, 
@@ -91,7 +90,6 @@ export class EmployeeRepository {
     };
   }
 
-  // 🚀 NEW: Full Edit Capability
   public async update(employeeId: string, orgId: string, updates: Partial<IEmployee>): Promise<IEmployee | null> {
     const setClauses: string[] = [];
     const values: any[] = [];
@@ -123,7 +121,6 @@ export class EmployeeRepository {
     return result.rows.length ? (result.rows[0] as IEmployee) : null;
   }
 
-  // 🚀 NEW: Delete Capability
   public async delete(employeeId: string, orgId: string): Promise<boolean> {
     const query = `
       DELETE FROM employees 

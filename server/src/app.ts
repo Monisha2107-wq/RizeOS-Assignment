@@ -16,29 +16,25 @@ class App {
     this.initializeSecurityMiddleware();
     this.initializeMiddleware();
     this.initializeRoutes();
-    this.initializeErrorHandling(); // MUST be the very last thing initialized
+    this.initializeErrorHandling(); 
   }
 
   private initializeSecurityMiddleware(): void {
-    // 1. Helmet: Sets 15+ security headers
     this.express.use(helmet());
 
-    // 2. Strict CORS: Only allow your specific frontend
     const allowedOrigins = [
       process.env.FRONTEND_URL || 'http://localhost:5173', 
-      // Add production URL here later, e.g., 'https://rizeos.vercel.app'
     ];
     
     this.express.use(cors({
       origin: allowedOrigins,
-      credentials: true, // Needed if you use cookies later
+      credentials: true, 
       methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     }));
 
-    // 3. Global Rate Limiting
     const limiter = rateLimit({
-      windowMs: 15 * 60 * 1000, // 15 minutes
-      max: 200, // Limit each IP to 200 requests per `window`
+      windowMs: 15 * 60 * 1000, 
+      max: 200, 
       message: { success: false, message: 'Too many requests from this IP, please try again later.' },
       standardHeaders: true,
       legacyHeaders: false,
@@ -47,7 +43,7 @@ class App {
   }
 
   private initializeMiddleware(): void {
-    this.express.use(express.json({ limit: '1mb' })); // Limit JSON body size to prevent payload exhaustion
+    this.express.use(express.json({ limit: '1mb' }));
     this.express.use(express.urlencoded({ extended: true, limit: '1mb' }));
   }
 
@@ -69,7 +65,6 @@ class App {
     });
   }
 
-  // 4. Global Error Handler
   private initializeErrorHandling(): void {
     this.express.use((err: any, req: Request, res: Response, next: NextFunction) => {
       console.error(`[ERROR] ${req.method} ${req.url} >>`, err.message);
@@ -80,7 +75,6 @@ class App {
       res.status(statusCode).json({
         success: false,
         message,
-        // Only leak the stack trace in development mode
         ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
       });
     });

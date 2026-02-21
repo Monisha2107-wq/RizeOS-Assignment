@@ -10,6 +10,7 @@ import Tasks from './pages/Tasks';
 import AIInsights from './pages/AIInsights';
 import Layout from './components/layout/Layout';
 import { useAuthStore } from './store/authStore';
+import NotFound from './pages/NotFound';
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
@@ -34,7 +35,7 @@ function App() {
             <Route path="ai-insights" element={<AIInsights />} />
           </Route>
 
-          <Route path="*" element={<Navigate to="/" />} />
+          <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
 

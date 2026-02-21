@@ -24,12 +24,10 @@ export class EmployeeService {
     return await EmployeeRepository.create(newEmployee);
   }
 
-  // 🚀 UPGRADED: Returns pagination metadata
   public async getOrgEmployees(orgId: string, params: IEmployeeQueryParams) {
     return await EmployeeRepository.findAllByOrg(orgId, params);
   }
 
-  // 🚀 NEW: Update Employee
   public async updateEmployee(employeeId: string, orgId: string, updates: Partial<IEmployee>): Promise<IEmployee> {
     if (updates.skills && Array.isArray(updates.skills)) {
       updates.skills = JSON.stringify(updates.skills) as any;
@@ -43,7 +41,6 @@ export class EmployeeService {
     return updatedEmployee;
   }
 
-  // 🚀 NEW: Delete Employee
   public async deleteEmployee(employeeId: string, orgId: string): Promise<void> {
     const isDeleted = await EmployeeRepository.delete(employeeId, orgId);
     if (!isDeleted) {

@@ -12,7 +12,6 @@ const createEmployeeSchema = z.object({
   wallet_address: z.string().optional()
 });
 
-// 🚀 NEW: Zod Schema for Pagination/Filtering
 const getEmployeesQuerySchema = z.object({
   page: z.coerce.number().min(1).default(1),
   limit: z.coerce.number().min(1).max(100).default(10),
@@ -22,7 +21,6 @@ const getEmployeesQuerySchema = z.object({
   role: z.string().optional()
 });
 
-// 🚀 NEW: Zod Schema for partial updates
 const updateEmployeeSchema = z.object({
   name: z.string().min(2).optional(),
   role: z.string().min(2).optional(),
@@ -51,7 +49,6 @@ export class EmployeeController {
     }
   }
 
-  // 🚀 UPGRADED: Handing Pagination & Query Validation
   public async getEmployees(req: AuthRequest, res: Response): Promise<void> {
     try {
       const orgId = req.user!.orgId;
@@ -78,7 +75,6 @@ export class EmployeeController {
     }
   }
 
-  // 🚀 NEW: Update Employee HTTP handler
   public async updateEmployee(req: AuthRequest, res: Response): Promise<void> {
     try {
       const orgId = req.user!.orgId;
@@ -97,7 +93,6 @@ export class EmployeeController {
     }
   }
 
-  // 🚀 NEW: Delete Employee HTTP handler
   public async deleteEmployee(req: AuthRequest, res: Response): Promise<void> {
     try {
       const orgId = req.user!.orgId;

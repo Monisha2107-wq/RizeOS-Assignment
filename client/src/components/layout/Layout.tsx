@@ -55,10 +55,7 @@ export default function Layout() {
   );
 
   return (
-    // Set the outer container to exactly screen height and prevent scrolling
     <div className="flex h-screen w-full bg-background overflow-hidden">
-      
-      {/* DESKTOP SIDEBAR - h-full ensures it takes up exactly the screen height */}
       <aside className="hidden w-64 flex-col border-r bg-card md:flex h-full">
         <div className="flex h-14 items-center border-b px-4 lg:h-[60px] lg:px-6">
           <div className="flex items-center gap-2 font-semibold tracking-tight">
@@ -86,13 +83,10 @@ export default function Layout() {
         </div>
       </aside>
 
-      {/* MAIN CONTENT AREA - min-w-0 prevents flex blowout */}
       <div className="flex flex-1 flex-col min-w-0">
         
-        {/* TOP HEADER - Fixed height, border bottom */}
         <header className="flex h-14 shrink-0 items-center gap-4 border-b bg-background px-4 lg:h-[60px] lg:px-6 justify-between md:justify-end">
           
-          {/* MOBILE MENU TRIGGER */}
           <Sheet>
             <SheetTrigger asChild>
               <Button variant="outline" size="icon" className="shrink-0 md:hidden">
@@ -114,13 +108,11 @@ export default function Layout() {
             </SheetContent>
           </Sheet>
 
-          {/* RIGHT SIDE ACTIONS */}
           <div className="flex items-center gap-4">
             <ThemeToggle />
           </div>
         </header>
 
-        {/* PAGE CONTENT INJECTION (Outlet) - overflow-y-auto makes it scroll! */}
         <main className="flex-1 overflow-y-auto p-4 md:p-8">
           <Outlet />
         </main>
