@@ -2,7 +2,7 @@
 > **Multi-tenant, AI-powered, Web3-auditable Workforce Intelligence Platform**
 > Built for the RizeOS Founder Engineer Internship Assessment
 
-[![Demo Video](https://img.shields.io/badge/Demo%20Video-Watch-red?style=for-the-badge)](TODO)
+[![Demo Video](https://img.shields.io/badge/Demo%20Video-Watch-red?style=for-the-badge)](https://drive.google.com/file/d/1fj4SUELxNvOqvghYOhGss7IFK9-2BZxz/view)
 [![GitHub](https://img.shields.io/badge/GitHub-Repo-black?style=for-the-badge)](https://github.com/Monisha2107-wq/RizeOS-Assignment)
 
 ---
